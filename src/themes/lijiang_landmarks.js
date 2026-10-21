@@ -7,6 +7,12 @@ import { at, EDGE, farGround, waterMat, textTex } from './common.js';
 import { beam } from './tokyo_kit.js';
 import { tiledBox } from './beijing_kit.js';
 import { CN, cobbleTex } from './lijiang_kit.js';
+import { finishFlowerScene, rememberFlowerFacade } from './lijiang_flowers.js';
+
+// the height of the surface of a scaled low-poly mesh (a hill) under (x, z): things standing on it must sit on its facets,
+// which lie below the smooth shape the mesh approximates
+const _ray = new THREE.Raycaster(), _down = new THREE.Vector3(0, -1, 0), _from = new THREE.Vector3();
+function surfaceY(mesh, x, z, fallback) { _ray.set(_from.set(x, 1000, z), _down); const h = _ray.intersectObject(mesh, false)[0]; return h ? h.point.y : fallback; }
 
 function muralTex() {   // the Baisha murals: rows of haloed figures among clouds and lotus, in mineral reds, greens and gold
   return canvasTex(512, 256, (g, w, h) => {
@@ -91,6 +97,7 @@ export function ljLandmarks(K) {
       K.gableRoof(b, cx, y0 + 6.6, cz, len, d, 2.3, Math.PI / 2);
       for (let k = 0; k < 2; k++) K.lantern(b, cx - side * (d / 2 + 0.7), y0 + 3.1, cz - len / 4 + (k * len) / 2, 0.55);
       b.add(G.box, VC.solid, cx - side * (d / 2 + 0.5), y0 + 3.95, cz, 1.1, 0.1, len, 0, 0, side * 0.32, '#2e3036');
+      rememberFlowerFacade(b, cx - side * d / 2, cz, len, side, y0);
       z += len + rand(0, 0.6);
     }
   };
@@ -138,7 +145,7 @@ export function ljLandmarks(K) {
     K.oldRow(b, -1, 0, 80);
     K.caravan(b, -(EDGE + 2.4), -20, 4, -1);
     K.crowd(b, EDGE + 1.2, EDGE + 6.2, 2, 78, 14); K.crowd(b, -(EDGE + 1.2), -(EDGE + 6.2), 2, 78, 14);
-    const g = b.build();
+    const g = finishFlowerScene(b, 'waterWheels');
     for (const zc of [-14, -26, -38]) { const w = wheelGroup(); w.position.set(15.3, 4.9, zc); g.add(w); turners.push([w, 'x', 0.32]); }
     return g;
   };
@@ -160,7 +167,7 @@ export function ljLandmarks(K) {
     K.canal(b, 1); K.oldRow(b, 1, 0, 80);
     for (let z = 5; z < 78; z += 10) K.willow(b, EDGE + 3.4, -z, 0.95);
     K.crowd(b, EDGE + 1.2, EDGE + 2.6, 2, 78, 10); K.crowd(b, -(EDGE + 1.2), -(EDGE + 6), 2, 78, 10);
-    return b.build();
+    return finishFlowerScene(b, 'sifang');
   };
 
   // ---------- the Mu Mansion: the stone archway over the street, the council hall behind red walls ----------
@@ -196,7 +203,7 @@ export function ljLandmarks(K) {
     K.caravan(b, -(EDGE + 3), -48, 5, 1);
     lamps(b, -(EDGE + 0.8), 24, 78, 12); lamps(b, EDGE + 0.8, 24, 78, 12);
     K.crowd(b, EDGE + 1.2, EDGE + 6.2, 2, 78, 10); K.crowd(b, -(EDGE + 1.2), -24, 2, 78, 18);
-    return b.build();
+    return finishFlowerScene(b, 'mufu');
   };
 
   // ---------- Wangu Tower on Lion Hill, a stair of lanterns up to it, terraces of roofs opposite ----------
@@ -205,23 +212,29 @@ export function ljLandmarks(K) {
     farGround(b, 1, '#1e1c1c'); farGround(b, -1, '#1e1c1c');
     const hx = -60, hz = -44;
     b.add(G.sph, VC.solid, hx, -30, hz, 104, 92, 80, 0, 0, 0, '#26402c');   // a broad mound, most of the sphere sunk below the ground
-    const hillY = (x, z) => { const u = (x - hx) / 52, v = (z - hz) / 40, q = 1 - u * u - v * v; return q > 0 ? -30 + 46 * Math.sqrt(q) : -1; };
+    const hill = new THREE.Mesh(G.sph); hill.position.set(hx, -30, hz); hill.scale.set(104, 92, 80); hill.updateMatrixWorld();
+    const hillY = (x, z) => surfaceY(hill, x, z, -1);
     for (let k = 0; k < 90; k++) { const x = rand(-100, -18), z = -rand(6, 80), y = hillY(x, z); if (y > 0.8) K.pine(b, x, z, rand(0.9, 1.3), { y: y - 0.3 }); }
     const tx = -48, ty = hillY(tx, hz) - 0.4;
-    stone(b, tx, ty - 1.2, hz, 16, 2.2, 16, 0xffffff);
+    { const y0 = Math.min(ty - 1.2, ...[[-8, -8], [-8, 8], [8, -8], [8, 8]].map(([dx, dz]) => hillY(tx + dx, hz + dz))) - 0.3; stone(b, tx, y0, hz, 16, ty + 1 - y0, 16, 0xffffff); }
     const top = K.tower(b, tx, ty + 1, hz, { w: 9.5, tiers: 5, tierH: 3.4, shrink: 0.84 });
     b.cyl(VC.metal, '#e8b84a', tx, top + 1.2, hz, 0.2, 2.4, 'cyl8');
     for (let k = 0; k < 14; k++) {   // the stair up the hill, lanterns either side
-      const x = -12 - k * 2.6, y = Math.max(0, hillY(x, hz)) - 0.2;
-      stone(b, x, Math.max(0, y - 0.6), hz, 2.6, 0.6 + Math.min(y, 0.6), 4, 0xffffff);
-      if (k % 2 === 0) for (const s of [-1, 1]) K.lantern(b, x, y + 1.6, hz + s * 2.4, 0.55);
+      const x = -12 - k * 2.6, y = Math.max(0, hillY(x, hz)) - 0.2, yd = Math.max(0, hillY(x + 2.6, hz)) - 0.2;
+      const y0 = Math.max(0, Math.min(y, yd) - 0.6);   // down past the step below, so the flight has no gaps on the steep lower slope
+      stone(b, x, y0, hz, 2.6, y + 0.6 - y0, 4, 0xffffff);
+      if (k % 2 === 0) for (const s of [-1, 1]) {   // a lantern hung from a crooked post beside the step
+        b.cyl(VC.solid, '#3a2414', x, y + 1.15, hz + s * 2.85, 0.06, 2.3, 'cyl8');
+        b.box(VC.solid, '#3a2414', x, y + 2.27, hz + s * 2.62, 0.08, 0.08, 0.5);
+        K.lantern(b, x, y + 1.9, hz + s * 2.4, 0.55);
+      }
     }
     // right: house roofs climbing the slope in terraces, every eave hung with lanterns
     for (let k = 0; k < 5; k++) terraceRow(b, 11.5 + k * 9.5, k * 2.4, k % 2 ? 2 : 0, 80);
     K.oldRow(b, -1, 0, 30); K.oldRow(b, -1, 58, 80);
     lamps(b, EDGE + 0.8, 4, 78, 10);
     K.crowd(b, EDGE + 1.2, EDGE + 6.2, 2, 78, 10); K.crowd(b, -(EDGE + 1.2), -(EDGE + 6.2), 2, 78, 12);
-    return b.build();
+    return finishFlowerScene(b, 'wangu');
   };
 
   // ---------- Black Dragon Pool: the five-arched marble bridge out to the Moon-Embracing Pavilion ----------
@@ -264,7 +277,7 @@ export function ljLandmarks(K) {
     for (let z = 6; z < 78; z += 11) K.willow(b, EDGE + 4.6, -z, 0.95);
     lamps(b, EDGE + 0.8, 4, 78, 12);
     K.crowd(b, EDGE + 1.2, EDGE + 6.2, 2, 78, 10); K.crowd(b, -(EDGE + 1.2), -(EDGE + 5.6), 2, 78, 10);
-    return b.build();
+    return finishFlowerScene(b, 'blackDragon');
   };
 
   // ---------- Baisha: earthen lanes running at the snow mountain, the great tree, the murals ----------
@@ -284,7 +297,8 @@ export function ljLandmarks(K) {
     K.adobe(b, 11.5, 0, -52, 0.7, 3.2, 36, '#e8d4bc');
     K.gableRoof(b, 11.5, 3.2, -52, 36, 0.9, 0.35, Math.PI / 2, { gable: false, eave: 0.15 });
     hall(b, 13.2, -52, { w: 5, d: 3, h: 3.6, base: 0.5, ry: Math.PI / 2 });
-    b.add(G.plane, plaque('大宝积宫'), 10.15, 3.4, -52, 2.6, 0.65, 1, 0, -Math.PI / 2, 0);
+    b.box(VC.solid, '#5a1a12', 11.12, 1.15, -52, 0.06, 2.3, 2.4);   // the temple gate's red doors in the wall, its name board over them
+    b.add(G.plane, plaque('大宝积宫'), 11.11, 2.75, -52, 2.6, 0.65, 1, 0, -Math.PI / 2, 0);
     hall(b, 26, -54, { w: 14, d: 9, h: 5, base: 1.0, ry: Math.PI / 2 });
     b.add(G.plane, muralMat, 21.95, 3.6, -54, 12, 4.2, 1, 0, -Math.PI / 2, 0);
     for (const z of [42, 66]) K.walnut(b, 34, -z, 1.4);
@@ -292,7 +306,7 @@ export function ljLandmarks(K) {
     K.caravan(b, EDGE + 2.6, -20, 3, -1);
     K.yak(b, EDGE + 3.2, -70, Math.PI * 0.2);
     K.crowd(b, EDGE + 1.2, EDGE + 6, 2, 78, 8); K.crowd(b, -(EDGE + 1.2), -(EDGE + 6), 2, 78, 8);
-    return b.build();
+    return finishFlowerScene(b, 'baisha');
   };
 
   // ---------- Blue Moon Valley: turquoise terraces under the snow mountain ----------
@@ -309,12 +323,18 @@ export function ljLandmarks(K) {
         }
       }
       b.box(VC.solid, '#3a4248', s * 47.2, -3, -40, 2, 5, 80);
+      b.box(VC.solid, '#2c3034', s * 74, -4.1, -40, 54, 0.2, 80);   // the valley floor beyond the last dam
+      const slopes = [];
       for (let k = 0; k < 7; k++) {   // rocky slopes with snow patches closing the valley
-        const x = s * rand(52, 90), z = -rand(4, 76), h = rand(18, 42), w = rand(16, 30);
-        b.add(G.cone4, VC.solid, x, h / 2 - 4, z, w, h, w * rand(0.8, 1.3), 0, rand(0, 3), 0, pick(['#4a4e58', '#565a62', '#3e424a']));
-        b.add(G.cone4, VC.solid, x, h - 4 - h * 0.18, z, w * 0.36, h * 0.36, w * 0.4, 0, rand(0, 3), 0, '#e8eef8');
+        const x = s * rand(52, 90), z = -rand(4, 76), h = rand(18, 42), w = rand(16, 30), d = w * rand(0.8, 1.3), ry = rand(0, 3);
+        b.add(G.cone4, VC.solid, x, h / 2 - 4, z, w, h, d, 0, ry, 0, pick(['#4a4e58', '#565a62', '#3e424a']));
+        b.add(G.cone4, VC.solid, x, h * 0.82 - 3.8, z, w * 0.37, h * 0.36 + 0.4, d * 0.37, 0, ry, 0, '#e8eef8');
+        const m = new THREE.Mesh(G.cone4); m.position.set(x, h / 2 - 4, z); m.rotation.y = ry; m.scale.set(w, h, d); m.updateMatrixWorld(); slopes.push(m);
       }
-      for (let k = 0; k < 10; k++) K.pine(b, s * rand(44, 70), -rand(4, 78), rand(1.0, 1.4), { y: -2 });
+      for (let k = 0; k < 10; k++) {   // pines on the valley floor and up the lower slopes
+        const x = s * rand(50, 72), z = -rand(4, 78);
+        K.pine(b, x, z, rand(1.0, 1.4), { y: Math.max(-4, ...slopes.map((m) => surfaceY(m, x, z, -99))) - 0.3 });
+      }
       for (let k = 0; k < 6; k++) K.peach(b, s * (EDGE + rand(5, 6.5)), -rand(4, 78), rand(0.55, 0.75));
       refl(b, s * 18, -40, 60, 4, '#fff0d0', -0.45);
     }
@@ -324,7 +344,7 @@ export function ljLandmarks(K) {
     b.add(G.plane, plaque('蓝月谷'), EDGE + 1.4, 2.4, -6, 2.2, 0.55, 1, 0, -Math.PI / 2, 0);
     b.cyl(VC.solid, '#3a2414', EDGE + 1.4, 1.1, -6, 0.08, 2.2, 'cyl8');
     K.crowd(b, EDGE + 1.2, EDGE + 5.4, 4, 78, 6, { kind: 'tourist' }); K.crowd(b, -(EDGE + 1.2), -(EDGE + 5.4), 4, 78, 6, { kind: 'tourist' });
-    return b.build();
+    return finishFlowerScene(b, 'blueMoon');
   };
 
   return {

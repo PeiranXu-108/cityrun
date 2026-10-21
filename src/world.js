@@ -31,10 +31,24 @@ import bj from "./themes/beijing.js";
 import syd from "./themes/sydney.js";
 import ldn from "./themes/london.js";
 import lj from "./themes/lijiang.js";
+import paris from "./themes/paris.js";
 
-export const THEMES = { ny, pgh, hz, bj, tokyo, syd, ldn, lj };
-export const THEME_ORDER = ["ny", "pgh", "hz", "bj", "tokyo", "syd", "ldn", "lj"];
+export const THEMES = { ny, pgh, hz, bj, tokyo, syd, ldn, lj, paris };
+export const THEME_ORDER = ["ny", "pgh", "hz", "bj", "tokyo", "syd", "ldn", "lj", "paris"];
 export const TOUR_LEN = CHUNK_LEN * 15;
+// The World Tour visits every city once in a random order, then shuffles again; never the same city twice in a row.
+function tourOrder(prev) {
+  const o = THEME_ORDER.slice();
+  for (let i = o.length - 1; i > 0; i--) {
+    const j = randi(0, i);
+    [o[i], o[j]] = [o[j], o[i]];
+  }
+  if (o[0] === prev) {
+    const j = randi(1, o.length - 1);
+    [o[0], o[j]] = [o[j], o[0]];
+  }
+  return o;
+}
 export const MOVE_K = 0.55; // moving train speed relative to the player
 export const TRIGGER = 115; // distance at which parked "moving" trains start rolling
 const AHEAD = 330,
@@ -90,7 +104,9 @@ export class World {
 
   themeAt(d) {
     if (!this.tour) return this.base;
-    const i = Math.floor(Math.max(d, 0) / TOUR_LEN) % this.order.length;
+    const i = Math.floor(Math.max(d, 0) / TOUR_LEN);
+    while (this.order.length <= i)
+      this.order.push(...tourOrder(this.order[this.order.length - 1]));
     return this.order[i];
   }
 
@@ -107,11 +123,8 @@ export class World {
     this.portals = [];
     this.base = theme;
     this.tour = tour;
-    const s = THEME_ORDER.indexOf(theme);
-    this.order = THEME_ORDER.map(
-      (_, k) => THEME_ORDER[(s + k) % THEME_ORDER.length],
-    );
-    if (tour) this.order.forEach((id) => this.ensureTheme(id));
+    this.order = tour ? tourOrder(null) : [theme]; // a fresh random tour every reset
+    if (tour) THEME_ORDER.forEach((id) => this.ensureTheme(id));
     else this.ensureTheme(theme);
     this.chunkD = Math.floor(startD / CHUNK_LEN) * CHUNK_LEN;
     this.gen = false;

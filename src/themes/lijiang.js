@@ -8,57 +8,11 @@ import { makeTrack, skyline, skyTex, SKY_VC, polar, at, EDGE, farGround, waterMa
 import { roofGeo } from './beijing_kit.js';
 import { makeKit, cobbleTex, CN } from './lijiang_kit.js';
 import { ljLandmarks } from './lijiang_landmarks.js';
+import { snowMountain, mountainMist } from './lijiang_mountain.js';
+import { finishFlowerScene } from './lijiang_flowers.js';
 
 const EYE = 4.5;
 
-// ---------- the Jade Dragon Snow Mountain ----------
-// Thirteen peaks along a jagged ridge with 扇子陡 in the middle; the summits still gold in the last sun (日照金山)
-// while the snowfields below fall into blue shadow and the rock goes violet.
-const PEAKS = [[-30, 140, 6], [-23, 176, 5.5], [-17.5, 160, 4], [-12, 200, 5], [-6, 214, 4.5], [0, 264, 6.5], [6.5, 222, 4.8], [12, 190, 5.5],
-  [18.5, 172, 4.5], [25, 150, 6]];
-const ridgeH = (deg) => {
-  let h = 110 + 18 * Math.cos(deg * 0.09);   // the massif, a high wall between the peaks
-  for (const [d, ph, w] of PEAKS) { const t = Math.abs(deg - d) / w; if (t < 1) h = Math.max(h, 110 + (ph - 110) * Math.pow(1 - t, 1.2)); }
-  h += 7 * Math.sin(deg * 1.9 + 0.5) + 4 * Math.sin(deg * 4.7) + 2 * Math.sin(deg * 11 + 2);
-  const taper = 1 - THREE.MathUtils.smoothstep(Math.abs(deg), 27, 37);   // the range falls away into the foothills at both ends
-  return 20 + (h - 20) * taper;
-};
-const MTN = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false });
-function snowMountain(b) {
-  const NU = 280, NV = 24, D0 = -38, D1 = 34, R0 = 860, RR = 1000, R1 = 1160, BASE = -210;
-  const pos = [], idx = [];
-  for (let i = 0; i <= NU; i++) {
-    const deg = D0 + ((D1 - D0) * i) / NU, H = ridgeH(deg), a = (deg * Math.PI) / 180;
-    for (let j = 0; j <= NV; j++) {
-      const r = R0 + ((R1 - R0) * j) / NV;
-      const f = r < RR ? Math.pow((r - R0) / (RR - R0), 0.85) : Math.pow(Math.max(0, 1 - (r - RR) / (R1 - RR)), 1.3);
-      const gully = (Math.sin(deg * 9.3 + r * 0.02) * Math.sin(deg * 3.7 + 1.3) + 0.4 * Math.sin(deg * 23)) * (1 - f) * f * 50;
-      pos.push(Math.sin(a) * r, BASE + (H - BASE) * f + gully, -Math.cos(a) * r);
-    }
-  }
-  for (let i = 0; i < NU; i++) for (let j = 0; j < NV; j++) { const p = i * (NV + 1) + j, q = p + NV + 1; idx.push(p, q, p + 1, p + 1, q, q + 1); }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setIndex(idx); g.computeVertexNormals();
-  const P = g.attributes.position, N = g.attributes.normal, col = new Float32Array(P.count * 3);
-  const L = new THREE.Vector3(-0.9, 0.35, 0.18).normalize(), n = new THREE.Vector3(), c = new THREE.Color();
-  const snowLit = new THREE.Color('#ffd2a8'), snowSh = new THREE.Color('#5a68a6'), gold = new THREE.Color('#ffb860');
-  const rockLit = new THREE.Color('#6a4a58'), rockSh = new THREE.Color('#22263f'), haze = new THREE.Color('#3a4474');
-  for (let k = 0; k < P.count; k++) {
-    const x = P.getX(k), y = P.getY(k), z = P.getZ(k), deg = (Math.atan2(x, -z) * 180) / Math.PI;
-    n.fromBufferAttribute(N, k);
-    const lit = Math.max(0, n.dot(L)), H = ridgeH(deg);
-    const snowY = H - 44 - 22 * (0.5 + 0.5 * Math.sin(deg * 1.7)) + 18 * Math.sin(deg * 11 + z * 0.01) * Math.sin(deg * 4.3);   // snow on the upper slopes, streaking down the gullies
-    const snow = THREE.MathUtils.smoothstep(y, snowY - 10, snowY + 10) * THREE.MathUtils.smoothstep(n.y, 0.12, 0.42);
-    c.copy(rockSh).lerp(rockLit, lit).lerp(snowSh.clone().lerp(snowLit, Math.pow(lit, 0.8)), snow);
-    c.lerp(gold, snow * lit * THREE.MathUtils.smoothstep(y, H - 70, H) * 0.6);   // the last light on the summits
-    c.lerp(haze, THREE.MathUtils.smoothstep(-y, -60, 40) * 0.7);
-    col.set([c.r, c.g, c.b], k * 3);
-  }
-  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(P.count * 2), 2));
-  b.addM(g, MTN, new THREE.Matrix4(), null);
-}
 // a ring of low blue foothills, dipping in front of the snow mountain, villages twinkling at their feet
 function foothills(b) {
   const N = 360, pos = [], cols = [], idx = [], lo = new THREE.Color('#141830'), hi = new THREE.Color('#353c6a');
@@ -119,6 +73,7 @@ export default {
     // a lakeshore like Lashi Hai: willows, a white balustrade, a pavilion out on the water, lit houses on the far shore
     const lakeSide = (b, s) => {
       b.add(G.plane, lake, s * 81, -0.4, -40, 140, 80, 1, -Math.PI / 2, 0, 0);
+      b.box(VC.solid, '#2e2c26', s * 141, -1.4, -40, 60, 2.2, 80);   // the far shore the houses stand on
       for (let z = 2; z < 80; z += 4) { b.box(VC.solid, '#e8e6e0', s * 11.3, 0.5, -z, 0.25, 1.0, 0.25); b.add(G.box, marble, s * 11.3, 0.95, -z - 2, 0.14, 0.12, 4); }
       for (let z = rand(3, 7); z < CHUNK_LEN - 2; z += rand(7, 10)) K.willow(b, s * (EDGE + 6.2), -z, rand(0.95, 1.12), { ry: s > 0 ? Math.PI : 0 });
       if (chance(0.6)) { const z = -rand(20, 60), x = s * rand(26, 40); b.box(VC.solid, '#8a8478', x, -0.1, z, 7, 0.6, 7); K.tower(b, x, 0.2, z, { w: 5, tiers: 1, tierH: 3.0, open: true }); refl(b, x, z, 60, 4, '#ffc870', -0.35); }
@@ -166,7 +121,7 @@ export default {
       }
       if (kind === 'bar') for (const z of [12, 32, 52, 72]) K.lanternSpan(b, -z);
       else if (kind === 'old' && chance(0.4)) for (const z of [20, 56]) K.lanternSpan(b, -z);
-      return b.build();
+      return finishFlowerScene(b, kind);
     };
 
     const sky = skyline({
@@ -182,6 +137,8 @@ export default {
         },
       ],
     });
+    const mist = mountainMist();
+    sky.add(mist.group);
 
     // CR200J "Green Giant" trains parked; the old town's mock-steam tourist train comes at you
     const trainStyle = {
@@ -234,7 +191,7 @@ export default {
       track, decor, skyline: sky, trainStyle, barrier,
       landmarks: LM.landmarks,
       coinGeo: coinGeometry('qixing'), coinMat: coinMaterial('#ffd04a', '#ffa000'),
-      update(t) { K.update(t); LM.update(t); lake.userData.scroll.offset.y = -t * 0.01; },
+      update(t) { K.update(t); LM.update(t); mist.update(t); lake.userData.scroll.offset.y = -t * 0.01; },
     };
   },
 };

@@ -6,6 +6,7 @@ import { buildingRow, facadeMat, EDGE, waterMat, textTex, at } from './common.js
 import { beam, wire } from './tokyo_kit.js';
 import { roofGeo, tiledBox } from './beijing_kit.js';
 import { treeKit, lijiangTreeKit } from './trees.js';
+import { rememberFlowerFacade } from './lijiang_flowers.js';
 
 const LANTERN = new THREE.SphereGeometry(0.5, 10, 7);   // a few facets read as the bamboo ribs, and the old town hangs ~80 per chunk
 
@@ -223,9 +224,16 @@ export function makeKit() {
   K.shopGoods = (b, x, z, side, kind = randi(0, 4)) => {   // what is on show under the eave
     if (kind === 0) for (let k = 0; k < 5; k++) { const zz = z - 1.4 + k * 0.7; b.add(G.cone8, VC.solid, x, 0.35, zz, 0.42, 0.7, 0.42, Math.PI, 0, 0, pick(['#8a4a2a', '#c8702a', '#5a2a1a', '#a85a2a'])); b.cyl(VC.solid, '#e8d8b0', x, 0.72, zz, 0.23, 0.05); }   // hand drums
     else if (kind === 1) { b.block(VC.solid, WOOD, x, 0, z, 0.6, 0.9, 2.4); for (let k = 0; k < 8; k++) b.sph(VC.metal, '#e8ecf4', x + rand(-0.2, 0.2), 0.96, z + rand(-1.1, 1.1), rand(0.05, 0.1), true); }   // silver
-    else if (kind === 2) for (let k = 0; k < 5; k++) b.box(VC.solid, pick(['#c8202c', '#2a5ad8', '#e8a020', '#1f8a6a', '#8a3ad8', '#f2f0ea']), x - side * 0.05, 1.9, z - 1.2 + k * 0.6, 0.03, 1.4, 0.45);   // shawls
+    else if (kind === 2) {   // shawls hung from a wooden rail on two posts
+      for (const dz of [-1.55, 1.55]) b.box(VC.solid, WOOD, x, 1.35, z + dz, 0.06, 2.7, 0.06);
+      b.box(VC.solid, WOOD, x, 2.68, z, 0.06, 0.06, 3.16);
+      for (let k = 0; k < 5; k++) b.box(VC.solid, pick(['#c8202c', '#2a5ad8', '#e8a020', '#1f8a6a', '#8a3ad8', '#f2f0ea']), x - side * 0.045, 1.95, z - 1.2 + k * 0.6, 0.03, 1.4, 0.45);
+    }
     else if (kind === 3) { b.block(VC.solid, WOOD, x, 0, z, 0.7, 0.8, 1.8); b.box(VC.glow, hdr('#ffe0a8', 1.0), x, 1.0, z, 0.6, 0.4, 1.6); b.add(G.plane, K.cakeMat, x - side * 0.36, 1.05, z, 1.4, 0.35, 1, 0, -side * Math.PI / 2, 0); }   // flower cakes
-    else for (let k = 0; k < 6; k++) b.cyl(VC.solid, pick(['#8a5a2a', '#6a3a1a', '#a8784a']), x, 0.12 + k * 0.08, z + rand(-0.8, 0.8), 0.22, 0.07);   // stacks of Pu'er cakes
+    else {   // Pu'er cakes in neat stacks on a low table
+      b.block(VC.solid, WOOD, x, 0, z, 0.6, 0.45, 1.8);
+      for (const dz of [-0.55, 0, 0.55]) for (let k = 0, n = randi(3, 6); k < n; k++) b.cyl(VC.solid, pick(['#8a5a2a', '#6a3a1a', '#a8784a']), x, 0.485 + k * 0.072, z + dz, 0.22, 0.07);
+    }
   };
   K.cakeMat = basic({ map: textTex('鲜花饼', { w: 384, h: 96, color: '#ffe8c0', bg: '#a81a1a', font: CN, weight: 700, size: 0.66 }), color: hdr('#ffffff', 1.1) });
   K.naxiFront = (b, i, { bar = false } = {}) => {
@@ -239,11 +247,12 @@ export function makeKit() {
     if (chance(0.35)) K.bougain(b, f - s * 0.14, 6.6, i.z + rand(-L / 4, L / 4), rand(1.8, 2.8), rand(1.6, 2.4), Math.PI / 2);
     if (chance(0.6)) K.shopGoods(b, f - s * 0.45, i.z + rand(-L / 5, L / 5), s);
     if (bar) {
-      K.neon(b, f - s * 0.12, 5.2, i.z, s, Math.min(4.2, L - 1));
+      K.neon(b, f - s * 0.04, 5.2, i.z, s, Math.min(4.2, L - 1));
       b.block(VC.solid, WOOD, f - s * 0.45, 4.0, i.z, 0.9, 0.1, L - 0.6);
       b.box(VC.solid, WOOD, f - s * 0.88, 4.5, i.z, 0.06, 0.9, L - 0.6);
       if (chance(0.5)) K.singer(b, f - s * 0.45, i.z + rand(-L / 4, L / 4), s, 4.1);
     }
+    rememberFlowerFacade(b, f, i.z, L, s);
   };
   K.naxiRoof = (b, i) => {
     K.gableRoof(b, i.x, i.h, i.z, i.len, i.d, 2.3, Math.PI / 2);
@@ -278,6 +287,7 @@ export function makeKit() {
       K.gableRoof(b, hx, 6.6, zc, len - 2, hd, 2.1, Math.PI / 2);
       if (chance(0.5)) K.walnut(b, side * rand(24, 30), zc + rand(-len / 3, len / 3), rand(1.0, 1.3));
       K.cosmos(b, side * 10.7, z + 0.6, z + len - 0.6);
+      rememberFlowerFacade(b, xw, zc, len, side, 0, true);
       z += len + rand(0.5, 2.5);
     }
   };

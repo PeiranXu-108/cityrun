@@ -23,6 +23,8 @@ export const CHARACTERS = [
     skin: '#f0c8a8', top: '#c8102e', pants: '#15171f', shoes: '#0c0c10', sole: '#ffd166', hat: '#101012', hair: '#3a2a1a', accent: '#ffd166', pack: '#f4f4f0', trail: '#ff3b4a' },
   { id: 'naxi', name: '纳西阿妹', en: 'NAXI', price: 4500, desc: '背着七星羊皮披肩的纳西姑娘，七颗星和日月绣在肩背上，「披星戴月」', style: 'naxi',
     skin: '#e8b890', top: '#2a54b0', pants: '#1a1e3a', shoes: '#3a2a20', sole: '#ffd166', hat: '#1a2a6a', hair: '#1a1210', accent: '#ffd166', pack: '#f2ece0', trail: '#1fc8e0' },
+  { id: 'parisienne', name: '巴黎女孩', en: 'PARISIENNE', price: 5000, desc: '戴红色贝雷帽、穿海魂衫的巴黎女孩，系着红色小方巾，手里攥着一根刚出炉的法棍', style: 'paris',
+    skin: '#f0cca8', top: '#f4f2ec', pants: '#1a2440', shoes: '#141414', sole: '#ff6aa8', hat: '#c8202c', hair: '#5a3220', accent: '#ff6aa8', pack: '#1a2a5a', trail: '#ff6aa8' },
 ];
 // triangular pennant for the opera general's back flags (靠旗)
 const FLAG = new THREE.BufferGeometry();
@@ -56,7 +58,7 @@ function part(geo, mat, x, y, z, sx, sy, sz, parent) {
 const grp = (parent, x = 0, y = 0, z = 0) => { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; };
 
 export function buildCharacter(d) {
-  const robot = d.style === 'robot', panda = d.style === 'panda', guard = d.style === 'guard', neko = d.style === 'neko', rabbit = d.style === 'rabbit', liberty = d.style === 'liberty', koala = d.style === 'koala', guardsman = d.style === 'guardsman', naxi = d.style === 'naxi';
+  const robot = d.style === 'robot', panda = d.style === 'panda', guard = d.style === 'guard', neko = d.style === 'neko', rabbit = d.style === 'rabbit', liberty = d.style === 'liberty', koala = d.style === 'koala', guardsman = d.style === 'guardsman', naxi = d.style === 'naxi', paris = d.style === 'paris';
   const root = new THREE.Group();
   const body = grp(root, 0, 0.6, 0);         // roll / lean pivot
   const inner = grp(body, 0, -0.6, 0);
@@ -80,7 +82,7 @@ export function buildCharacter(d) {
 
   const torso = grp(hips, 0, 0, 0);
   part(RB, mTop, 0, 0.32, guard ? 0.03 : 0, 0.52 * wide, 0.62, guard ? 0.4 : 0.3, torso);
-  if (!panda && !guard && !neko && !rabbit && !liberty && !koala && !guardsman && !naxi) part(BOX, E(d.accent, 2.6), 0, 0.38, -0.152, 0.53, 0.05, 0.012, torso);
+  if (!panda && !guard && !neko && !rabbit && !liberty && !koala && !guardsman && !naxi && !paris) part(BOX, E(d.accent, 2.6), 0, 0.38, -0.152, 0.53, 0.05, 0.012, torso);
   if (robot) {
     part(SPH, E(d.accent, 3), 0, 0.42, -0.16, 0.14, 0.14, 0.05, torso);
   }
@@ -112,6 +114,10 @@ export function buildCharacter(d) {
       part(SPH, M(['#ffd166', '#2a8ad8', '#e83a3a', '#3ab86a'][k % 4], 0.5), x, 0.1, 0.22, 0.055, 0.055, 0.02, torso);
       part(BOX, M('#f2ece0', 0.8), x, 0.02, 0.22, 0.012, 0.1, 0.01, torso);
     }
+  } else if (paris) {
+    for (let k = 0; k < 6; k++) part(BOX, M(d.pack, 0.6), 0, 0.08 + k * 0.1, 0, 0.535, 0.045, 0.315, torso);   // the marinière's navy stripes
+    part(BOX, M(d.hat, 0.6), 0, 0.6, -0.01, 0.36, 0.08, 0.33, torso);                   // a red neckerchief
+    part(BOX, M(d.hat, 0.6), 0.12, 0.52, -0.165, 0.08, 0.14, 0.03, torso).rotation.z = 0.35;
   } else if (koala) {
     part(RB, M(d.pack, 0.8), 0, 0.32, -0.12, 0.36, 0.44, 0.1, torso);                 // pale chest fur
   } else if (liberty) {
@@ -191,6 +197,12 @@ export function buildCharacter(d) {
     part(CYL, M(d.accent, 0.5), 0, 0.33, 0, 0.37, 0.025, 0.35, head);
     part(RB, M(d.hair, 0.7), 0, 0.02, 0.18, 0.07, 0.36, 0.07, head);                   // a braid down her back
     for (const sx of [-1, 1]) part(SPH, M('#ff8f8a', 0.7), sx * 0.11, 0.12, -0.14, 0.06, 0.04, 0.02, head);   // rosy cheeks
+  } else if (paris) {
+    part(RB, M(d.hair, 0.7), 0, 0.22, 0.03, 0.36, 0.3, 0.34, head);                    // a brown bob
+    part(BOX, M(d.hair, 0.7), 0, 0.29, -0.155, 0.3, 0.07, 0.02, head);                 // the fringe
+    part(CYL, M(d.hat, 0.85), 0.03, 0.37, 0, 0.42, 0.07, 0.4, head).rotation.z = -0.22;   // the beret, worn at a tilt
+    part(CYL, M(d.hat, 0.85), 0.07, 0.42, 0, 0.03, 0.06, 0.03, head);
+    part(BOX, M(d.hat, 0.5), 0, 0.09, -0.152, 0.07, 0.025, 0.01, head);               // red lips
   } else if (guardsman) {
     part(SPH, M(d.hat, 0.95), 0, 0.56, 0.01, 0.42, 0.64, 0.4, head);                 // the tall bearskin
     part(SPH, M('#1a1a1e', 0.95), 0.03, 0.74, -0.03, 0.34, 0.36, 0.34, head);
@@ -238,6 +250,17 @@ export function buildCharacter(d) {
   };
   const AL = arm(-1), AR = arm(1);
   if (koala) part(SPH, M(d.accent, 0.6), 0.02, -0.38, -0.05, 0.08, 0.22, 0.03, AL.el);   // a eucalyptus leaf
+  if (paris) {   // the marinière's stripes running down the sleeves too
+    for (const A of [AL, AR]) {
+      for (let k = 0; k < 3; k++) part(BOX, M(d.pack, 0.6), 0, -0.05 - k * 0.1, 0, 0.16, 0.035, 0.16, A.sh);
+      for (let k = 0; k < 2; k++) part(BOX, M(d.pack, 0.6), 0, -0.06 - k * 0.1, 0, 0.14, 0.035, 0.14, A.el);
+    }
+  }
+  if (paris) {   // a baguette fresh from the boulangerie, in its paper wrap
+    part(CYL, M('#d8a050', 0.7), 0, -0.34, -0.2, 0.075, 0.66, 0.075, AL.el).rotation.x = Math.PI / 2;
+    part(CYL, M('#f4f0e8', 0.8), 0, -0.33, -0.02, 0.09, 0.22, 0.09, AL.el).rotation.x = Math.PI / 2;
+    for (const z of [-0.32, -0.42]) part(BOX, M('#f0c880', 0.7), 0, -0.3, z, 0.05, 0.02, 0.05, AL.el);
+  }
   if (liberty) {   // the torch in her right hand, the tablet in her left
     part(CYL, M('#4f8472', 0.5), 0, -0.44, 0, 0.07, 0.24, 0.07, AR.el);
     part(CONE, M('#d9b24a', 0.4, 0.6), 0, -0.6, 0, 0.16, 0.1, 0.16, AR.el);

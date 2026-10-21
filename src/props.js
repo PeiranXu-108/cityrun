@@ -433,6 +433,28 @@ export function coinGeometry(kind) {
     g.translate(0, 0, -0.035);
     return g;
   }
+  if (kind === "eiffel") {
+    // the Eiffel Tower punched through a round coin: the antenna, the two floors, the legs flaring out over the arch
+    const s = new THREE.Shape();
+    s.absarc(0, 0, 0.43, 0, Math.PI * 2, false);
+    const R = [[0, 0.335], [0.02, 0.26], [0.03, 0.235], [0.032, 0.205], [0.06, 0.055], [0.09, 0.055], [0.09, 0.015], [0.074, 0.015],
+      [0.112, -0.11], [0.158, -0.11], [0.158, -0.152], [0.132, -0.152], [0.205, -0.3], [0.125, -0.3], [0.1, -0.245], [0.055, -0.205], [0, -0.19]];
+    const pts = [...R, ...R.slice(1, -1).reverse().map(([x, y]) => [-x, y])];
+    const h = new THREE.Path();
+    pts.forEach(([x, y], i) => (i ? h.lineTo(x, y) : h.moveTo(x, y)));
+    h.closePath();
+    s.holes.push(h);
+    const g = new THREE.ExtrudeGeometry(s, {
+      depth: 0.07,
+      bevelEnabled: true,
+      bevelThickness: 0.03,
+      bevelSize: 0.012,
+      bevelSegments: 2,
+      curveSegments: 12,
+    });
+    g.translate(0, 0, -0.035);
+    return g;
+  }
   if (kind === "fifty") {
     // the seven-sided 50p (a Reuleaux heptagon) with a crown punched through it
     const V = Array.from({ length: 7 }, (_, i) => {

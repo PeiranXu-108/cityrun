@@ -359,6 +359,42 @@ class Engine {
     }
   }
 
+  // ---------- Paris: musette accordion, gypsy-jazz guitar, violin, French-house filter chords ----------
+  accordion(t, notes, dur, v = 0.045, out = this.music) {   // musette: three reeds to a note, one tuned sharp and one flat so they beat
+    const g = this.gain(out);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.03);
+    g.gain.setValueAtTime(v * 0.85, t + dur * 0.75); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    if (out === this.music) g.connect(this.send);
+    const bp = this.filt('bandpass', 1400, 0.7, g), lp = this.filt('lowpass', 2800, 0.7, this.gain(g, 0.7));
+    for (const m of Array.isArray(notes) ? notes : [notes]) for (const d of [1, 1.008, 0.992]) this.osc('sawtooth', mtof(m) * d, t, dur, bp).connect(lp);
+  }
+  pompe(t, chord, v = 0.05, dur = 0.13) {   // la pompe: the gypsy guitar's short, bright chop, damped straight away
+    chord.forEach((m, i) => {
+      const tt = t + i * 0.007, g = this.gain(this.music); this.env(g, tt, 0.002, v, dur);
+      const f = this.filt('bandpass', 1700, 0.9, g);
+      this.osc('sawtooth', mtof(m), tt, dur, f); this.osc('square', mtof(m) * 2, tt, dur * 0.5, this.gain(f, 0.18));
+    });
+    const gn = this.gain(this.music); this.env(gn, t, 0.001, v * 0.45, 0.03); this.noiseSrc(t, 0.04, this.filt('bandpass', 3200, 1.2, gn));
+  }
+  violin(t, m, dur, v = 0.05) {   // a bowed violin: the bow's slow bite, the body's formants, vibrato arriving late
+    const g = this.gain(this.music);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + Math.min(0.12, dur * 0.3));
+    g.gain.setValueAtTime(v * 0.9, t + dur * 0.8); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    g.connect(this.send);
+    const f1 = this.filt('bandpass', 750, 1.1, g), f2 = this.filt('bandpass', 2600, 1.5, this.gain(g, 0.8));
+    const o = this.ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(mtof(m), t);
+    o.connect(f1); o.connect(f2); o.start(t); o.stop(t + dur + 0.05);
+    const lfo = this.ctx.createOscillator(); lfo.frequency.value = 5.8;
+    const lg = this.ctx.createGain(); lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(0, t + Math.min(0.2, dur * 0.35)); lg.gain.linearRampToValueAtTime(mtof(m) * 0.012, t + Math.min(0.55, dur * 0.8));
+    lfo.connect(lg); lg.connect(o.frequency); lfo.start(t); lfo.stop(t + dur);
+  }
+  filterChord(t, chord, dur, cut = 900, v = 0.035) {   // a French-house stab: detuned saws through a resonant low-pass, ducking after the kick
+    const g = this.gain(this.music);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + dur * 0.3); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const f = this.filt('lowpass', cut, 5, g);
+    chord.forEach((m) => { for (const d of [1, 1.006]) this.osc('sawtooth', mtof(m) * d, t, dur, f); });
+  }
+
   // ---------- jazz instruments for New York ----------
   rhodes(t, chord, dur, v = 0.05) {   // electric piano: soft tine attack with a slow tremolo
     const g = this.gain(this.music); this.env(g, t, 0.004, v, dur);
@@ -583,6 +619,17 @@ class Engine {
       this.horseBells(t + 1.35, 0.05, o); this.horseBells(t + 1.75, 0.04, o);
     });
   }
+  // Paris: the accordion breathes a chord, then the tower's lights twinkle down from the top
+  scintille() {
+    this.fx((t) => {
+      this.accordion(t, [62, 65, 69, 74], 1.5, 0.03, this.sfx);
+      [91, 95, 98, 103, 100, 96, 93, 98, 102, 105, 100, 107].forEach((m, i) => {
+        const tt = t + 0.35 + i * 0.075 + Math.random() * 0.02;
+        this.tone(tt, 'sine', mtof(m), mtof(m), 0.35, 0.035);
+        this.tone(tt, 'triangle', mtof(m + 12), mtof(m + 12), 0.12, 0.012);
+      });
+    });
+  }
   // New York subway door chime: two soft descending tones
   subway() {
     this.fx((t) => [[76, 0], [72, 0.42]].forEach(([m, d]) => {
@@ -699,7 +746,57 @@ const LJ_A = [[0, 5, 6], [6, 4, 2], [8, 3, 4], [12, 2, 4], [16, 3, 3], [19, 4, 1
 const LJ_B = [[0, 6, 4], [4, 5, 2], [6, 4, 2], [8, 5, 6], [14, 4, 2], [16, 3, 4], [20, 2, 4], [24, 1, 4], [28, 2, 4]];
 const DJEMBE = { 0: 'bass', 3: 'tone', 4: 'slap', 6: 'tone', 7: 'tone', 10: 'bass', 12: 'slap', 14: 'tone', 15: 'slap' };
 
+// Paris: a musette accordion and gypsy-jazz guitar meet French house. A café opening (la pompe, the upright bass, the
+// accordion's tune in D harmonic minor over Dm6 - Gm6 - Bb7 - A7), then four on the floor under filtered, pumping chords
+// that open up into the drop, a funky octave bass, celesta sparkles, and the violin taking up the tune.
+const PA_ROOT = [38, 43, 46, 45];
+const PA_CH = [[62, 65, 69, 71], [55, 58, 62, 64], [58, 62, 65, 68], [57, 61, 64, 67]];
+const PA_SC = [62, 64, 65, 67, 69, 70, 73, 74, 76, 77, 79, 81];   // D E F G A Bb C# D E F G A
+const PA_A = [[0, 4, 2], [2, 7, 2], [4, 9, 4], [8, 8, 2], [10, 7, 2], [12, 6, 2], [14, 7, 2], [16, 5, 4], [20, 7, 2], [22, 10, 6], [28, 9, 2], [30, 8, 2]];
+const PA_B = [[0, 9, 3], [3, 7, 1], [4, 5, 2], [6, 7, 2], [8, 9, 4], [12, 10, 4], [16, 8, 2], [18, 6, 2], [20, 5, 2], [22, 4, 4], [26, 6, 2], [28, 8, 4]];
+const PA_BASS = { 0: [0, 2], 3: [12, 1], 6: [0, 1], 8: [0, 2], 10: [7, 1], 11: [12, 1], 14: [0, 2] };
+
 const SONGS = {
+  paris: {
+    bpm: 124, swing: 0.1,
+    step(e, s, bar, t, dt) {
+      const B = bar % 16, sec = Math.floor(B / 4), c = bar % 4, r = PA_ROOT[c], ch = PA_CH[c];
+      const brk = B === 15 && s >= 8;
+      // the café: la pompe (the bass on one and three, chopped chords on two and four with their ghost upstrokes), brushes
+      if (sec === 0) {
+        if (s === 0 || s === 8) e.upright(t, s ? r + 7 : r, dt * 3.5, 0.3);
+        if (s === 4 || s === 12) e.pompe(t, ch, 0.05);
+        if (s === 3 || s === 11) e.pompe(t, ch, 0.02, 0.06);
+        e.shaker(t, s % 4 === 0 ? 0.045 : 0.025);
+      }
+      // the house groove: four on the floor, claps, open hats on the off-beats, the octave bass, the filtered chords
+      if (sec >= 1 && !brk) {
+        if (s % 4 === 0) e.kick(t, sec === 1 ? 0.7 : 0.9);
+        if (s === 4 || s === 12) e.clap(t, sec === 1 ? 0.16 : 0.24);
+        if (s % 4 === 2) e.hat(t, 0.07, true);
+        if (s % 2 === 1) e.hat(t, 0.03);
+        const bn = PA_BASS[s];
+        if (bn) e.bass(t, r + bn[0], dt * bn[1] * 0.9, 0.26, 'sawtooth', 520);
+        if (s % 4 === 0) {
+          const cut = sec === 1 ? 320 * Math.pow(5, ((B - 4) * 16 + s) / 64) : 2200 + 500 * Math.sin(bar * 0.9);
+          e.filterChord(t, ch, dt * 3.6, cut, sec === 1 ? 0.03 : 0.036);
+        }
+        if (sec >= 2 && s % 4 === 2) e.celesta(t, ch[(s / 2 + bar) % 4] + 12, 0.5, 0.03);
+        if (sec === 3 && (s === 4 || s === 12)) e.pompe(t, ch, 0.03);
+      }
+      // the tune: the accordion opens it and plays the drop, the violin takes it up in the last section
+      if (sec !== 1 && !brk) {
+        const off = (c % 2) * 16;
+        for (const [st, n, len] of c < 2 ? PA_A : PA_B) if (st === s + off) {
+          if (sec === 3) e.violin(t, PA_SC[n], dt * len * 0.95, 0.05);
+          else e.accordion(t, PA_SC[n], dt * len * 0.92, sec === 0 ? 0.045 : 0.04);
+        }
+      }
+      if (sec === 1 && s === 0) e.accordion(t, ch, dt * 15, 0.02);   // the accordion holding the harmony under the build
+      // the turn of the cycle: a chromatic run up the accordion, F# to C#, back to the tonic
+      if (brk) e.accordion(t, 66 + (s - 8), dt * 0.9, 0.035);
+    },
+  },
   lj: {
     bpm: 104, swing: 0.1,
     step(e, s, bar, t, dt) {

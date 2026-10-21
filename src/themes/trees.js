@@ -989,3 +989,112 @@ export function lijiangTreeKit() {
     walnut(b, x, z, s = 1, { y = 0 } = {}) { const t = pick(WN), m = place(x, y, z, rand(0, 6), s * 1.35); b.addM(t.wood, bark, m, '#8a7a66'); b.addM(t.canopy, VC.solid, m, null); },
   };
 }
+
+// ---------- Paris: plane trees on the boulevards, horse chestnuts in flower, clipped limes, yew and box in the formal
+// gardens, orange trees in their Versailles planters, wisteria over the doors and geraniums in the window boxes ----------
+const PARIS_PLANE = ['#5e8a40', '#6a9848', '#54803a', '#76a452', '#628e44', '#6e9c4c'];
+const MARRON = ['#2f5a2e', '#386634', '#2a5029', '#42703a', '#335e30'];
+function planeBarkTex() {   // the plane's mottled bark: cream and olive where the old bark has flaked away
+  return canvasTex(64, 128, (g, w, h) => {
+    g.fillStyle = '#9a9478'; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 80; i++) {
+      g.fillStyle = pick(['#d8d0b0', '#86825e', '#bab494', '#6e6c52', '#e6dec2']);
+      g.beginPath(); g.ellipse(rand(0, w), rand(0, h), rand(3, 9), rand(5, 13), rand(-0.4, 0.4), 0, 7); g.fill();
+    }
+  });
+}
+function clippedTex() {   // clipped box, yew and pleached lime: a tight speckle of small leaves
+  return canvasTex(64, 64, (g, w, h) => {
+    g.fillStyle = '#2c5428'; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 900; i++) { g.fillStyle = pick(['#3a6a34', '#22462a', '#4a7a3c', '#1c3a20', '#58883e', '#30602e']); g.fillRect(rand(0, w), rand(0, h), rand(1, 3), rand(1, 2.5)); }
+  });
+}
+function wisteriaTex() {   // wisteria racemes hanging in lilac bunches among pale leaves
+  return canvasTex(128, 128, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    for (let i = 0; i < 16; i++) { g.fillStyle = pick(['#5a7a3a', '#6a8a44', '#4a6a30']); g.beginPath(); g.ellipse(rand(8, 120), rand(6, 56), rand(5, 9), rand(2.5, 4), rand(0, 3), 0, 7); g.fill(); }
+    for (let c = 0; c < 10; c++) {
+      const x = rand(10, 118), y0 = rand(6, 36), L = rand(44, 84), col = pick(['#b89ae8', '#a07ad8', '#c8b0f0', '#9a70d0', '#d8c4f4']);
+      for (let k = 0; k < 18; k++) { const t = k / 18, r = 7 * (1 - t * 0.75); g.fillStyle = col; g.beginPath(); g.arc(x + rand(-r, r) * 0.6, y0 + t * L, Math.max(1.6, r * 0.55), 0, 7); g.fill(); }
+    }
+  }, { repeat: false });
+}
+function geraniumTex() {   // a window box of geraniums: round flower heads over scalloped leaves
+  return canvasTex(256, 64, (g, w) => {
+    g.clearRect(0, 0, w, 64);
+    for (let i = 0; i < 46; i++) { g.fillStyle = pick(['#2e6a2a', '#3a7a32', '#26582a']); g.beginPath(); g.arc(rand(4, w - 4), rand(30, 60), rand(6, 10), 0, 7); g.fill(); }
+    for (let i = 0; i < 22; i++) {
+      const x = rand(8, w - 8), y = rand(10, 36), col = pick(['#e82a2a', '#ff3a4a', '#d81e2a', '#ff5a6a', '#f4f0f0', '#ff6ab0']);
+      for (let k = 0; k < 7; k++) { g.fillStyle = col; g.beginPath(); g.arc(x + rand(-6, 6), y + rand(-5, 5), rand(2.5, 4), 0, 7); g.fill(); }
+    }
+  }, { repeat: false });
+}
+function marronnierTemplate() {   // horse chestnut in May: a dark dome studded with upright white flower candles
+  const t = camphorTemplate(MARRON), pos = t.canopy.attributes.position, nor = t.canopy.attributes.normal, parts = [t.canopy];
+  const cone = new THREE.ConeGeometry(0.12, 0.46, 5).toNonIndexed();
+  for (let k = 0, n = 0; k < 120 && n < 24; k++) {
+    const i = randi(0, pos.count - 1);
+    if (nor.getY(i) < 0.3) continue;
+    const g = cone.clone(); g.translate(pos.getX(i), pos.getY(i) + 0.16, pos.getZ(i));
+    const c = new THREE.Color(pick(['#fffaf2', '#fff2f4', '#ffffff', '#fbe8e2'])), col = new Float32Array(g.attributes.position.count * 3);
+    for (let v = 0; v < g.attributes.position.count; v++) col.set([c.r, c.g, c.b], v * 3);
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    parts.push(g); n++;
+  }
+  return { wood: t.wood, canopy: mergeGeometries(parts) };
+}
+const clipBoxes = new Map();
+function clipBox(w, h, d, s = 1.2) {   // a box whose UVs tile the clipped-leaf texture in world units
+  const key = `${w.toFixed(2)}|${h.toFixed(2)}|${d.toFixed(2)}`;
+  if (clipBoxes.has(key)) return clipBoxes.get(key);
+  const g = new THREE.BoxGeometry(w, h, d), uv = g.attributes.uv, dims = [[d, h], [d, h], [w, d], [w, d], [w, h], [w, h]];
+  for (let f = 0; f < 6; f++) for (let k = 0; k < 4; k++) { const i = f * 4 + k; uv.setXY(i, (uv.getX(i) * dims[f][0]) / s, (uv.getY(i) * dims[f][1]) / s); }
+  clipBoxes.set(key, g);
+  return g;
+}
+export function parisTreeKit() {
+  const bark = std({ map: planeBarkTex(), vertexColors: true, roughness: 0.9 });
+  const darkBark = std({ map: barkTex(), vertexColors: true, roughness: 0.95 });
+  const clip = std({ map: clippedTex(), vertexColors: true, roughness: 0.9 });
+  const wisMat = foliageMat(wisteriaTex(), { sway: 0.05, alphaTest: 0.5, emissive: 0.16 });
+  const gerMat = foliageMat(geraniumTex(), { sway: 0.03, alphaTest: 0.5, emissive: 0.14 });
+  const PL = Array.from({ length: 4 }, () => camphorTemplate(PARIS_PLANE));
+  const MA = Array.from({ length: 3 }, marronnierTemplate);
+  const D = Array.from({ length: 3 }, drapeTemplate);
+  const place = (x, y, z, ry, sx, sy = sx, sz = sx) => new THREE.Matrix4().compose(V(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, ry), V(sx, sy, sz));
+  const K = {
+    clipMat: clip,
+    // a boulevard plane: a tall clear trunk under a broad crown
+    plane(b, x, z, s = 1, { ry = rand(0, Math.PI * 2), y = 0 } = {}) { const t = pick(PL), m = place(x, y, z, ry, s * 1.35, s * 2.1, s * 1.35); b.addM(t.wood, bark, m, '#ffffff'); b.addM(t.canopy, VC.solid, m, null); },
+    marronnier(b, x, z, s = 1, { ry = rand(0, Math.PI * 2), y = 0 } = {}) { const t = pick(MA), m = place(x, y, z, ry, s * 1.55, s * 1.9, s * 1.55); b.addM(t.wood, darkBark, m, '#6a5a4a'); b.addM(t.canopy, VC.solid, m, null); },
+    // the gardens' clipped trees: a lime pleached into a box on a bare trunk, box and yew topiary, low parterre hedges
+    pleached(b, x, z, { w = 3.2, h = 2.8, d = 3.2, trunk = 2.8, ry = 0, y = 0 } = {}) {
+      b.cyl(darkBark, '#7a6a58', x, y + trunk / 2, z, 0.13, trunk, 'cyl8');
+      b.addM(clipBox(w, h, d), clip, place(x, y + trunk + h / 2, z, ry, 1), pick(['#ffffff', '#f0f8e8', '#e8f0e0']));
+    },
+    topiary(b, x, z, kind = 'cone', s = 1, y = 0) {
+      if (kind === 'cone') b.add(G.cone8, clip, x, y + 1.3 * s, z, 1.3 * s, 2.6 * s, 1.3 * s, 0, rand(0, 3), 0, '#ffffff');
+      else if (kind === 'ball') b.add(G.sphLow, clip, x, y + 0.6 * s, z, 1.2 * s, 1.1 * s, 1.2 * s, 0, rand(0, 3), 0, '#ffffff');
+      else { b.addM(clipBox(0.9 * s, 1.0 * s, 0.9 * s), clip, place(x, y + 0.5 * s, z, 0, 1), '#ffffff'); b.add(G.sphLow, clip, x, y + 1.5 * s, z, 0.9 * s, 0.9 * s, 0.9 * s, 0, 0, 0, '#ffffff'); }
+    },
+    hedge(b, x, z, w, h, d, y = 0) { b.addM(clipBox(w, h, d), clip, place(x, y + h / 2, z, 0, 1), pick(['#ffffff', '#f4f8ee'])); },
+    // an orange tree in its white Versailles box, ball finials at the corners
+    orange(b, x, z, s = 1) {
+      b.box(VC.solid, '#f2f0e8', x, 0.5 * s, z, 0.95 * s, 1.0 * s, 0.95 * s);
+      for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        b.box(VC.solid, '#2a4a3a', x + dx * 0.47 * s, 0.5 * s, z + dz * 0.47 * s, 0.1 * s, 1.02 * s, 0.1 * s);
+        b.sph(VC.solid, '#f2f0e8', x + dx * 0.47 * s, 1.08 * s, z + dz * 0.47 * s, 0.08 * s, true);
+      }
+      b.cyl(darkBark, '#6a5a48', x, 1.5 * s, z, 0.07 * s, 1.0 * s, 'cyl8');
+      b.add(G.sphLow, clip, x, 2.5 * s, z, 1.5 * s, 1.4 * s, 1.5 * s, 0, rand(0, 3), 0, '#ffffff');
+      for (let k = 0; k < 7; k++) { const a = rand(0, 6.28), e = rand(-0.4, 0.8); b.sph(VC.solid, '#ff9a1a', x + Math.cos(a) * Math.cos(e) * 0.74 * s, 2.5 * s + Math.sin(e) * 0.68 * s, z + Math.sin(a) * Math.cos(e) * 0.74 * s, 0.07 * s, true); }
+    },
+    // wisteria spilling w wide and h tall from (x, y) down a facade; ry turns the sheet to face its street
+    wisteria(b, x, y, z, w, h, ry = 0) { b.addM(pick(D), wisMat, place(x, y - h / 2, z, ry, w, h, 1), null); },
+    geraniums(b, x, y, z, w, ry = 0, box = '#3a2a24') {
+      b.add(G.box, VC.solid, x, y + 0.12, z, w, 0.24, 0.28, 0, ry, 0, box);
+      b.add(G.plane, gerMat, x, y + 0.36, z, w, w / 4 * 0.9, 1, 0, ry, 0, '#ffffff');
+    },
+  };
+  return K;
+}

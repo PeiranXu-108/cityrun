@@ -145,7 +145,7 @@ export const ui = {
   cityHead(t, tour) {
     $("cityEn").textContent = tour ? "WORLD TOUR" : t.en;
     $("cityCn").textContent = tour
-      ? "环游模式 · 八城连跑"
+      ? "环游模式 · 九城随机连跑"
       : `${t.name} · ${t.tagline}`;
   },
   stats(best, mult, coins) {

@@ -234,7 +234,7 @@ const MENU_A = 0.72;
 
 const wallet = () => save.data.coins + (run ? run.coins : 0);
 const reviveCost = () => 60 * Math.pow(2, run.revives);
-const baseTheme = () => (tour ? "ny" : city);
+const baseTheme = () => (tour ? world.themeAt(0) : city); // the tour's first city is drawn at random on every reset
 
 function refreshMenu() {
   const cards = THEME_ORDER.map((id) => {
@@ -254,7 +254,7 @@ function refreshMenu() {
     id: "tour",
     name: "环游",
     en: "WORLD TOUR",
-    tag: THEME_ORDER.map((id) => THEMES[id].name).join(" → "),
+    tag: "随机顺序 · 九城轮番登场",
     color: "#b26bff",
     best: save.data.bestBy.tour || 0,
     grad: `linear-gradient(120deg, ${THEME_ORDER.map((id, i) => `${THEMES[id].sky.mid} ${Math.round((i / (n - 1)) * 100)}%`).join(", ")})`,
@@ -326,7 +326,7 @@ async function pickCity(id) {
 }
 
 function resetWorld() {
-  world.reset({ theme: baseTheme(), tour, startD: -170 });
+  world.reset({ theme: city, tour, startD: -170 });
   applyEnv(baseTheme());
   particles.clear();
 }

@@ -257,7 +257,8 @@ export class Particles {
 // ---------- ambient weather around the camera ----------
 // mode: rain (streak lines), rise (embers), fall (petals), float (fireflies)
 // shape: 0 round dot, 1 spinning oval petal, 2 notched sakura petal, 3 fan-shaped ginkgo leaf, 4 five-lobed jacaranda bell,
-// 5 six-armed snowflake, 6 sky lantern (upright, glowing from its burner; use with mode rise)
+// 5 six-armed snowflake, 6 sky lantern (upright, glowing from its burner; use with mode rise),
+// 7 soap bubble (an iridescent rim with a window highlight; use with mode rise)
 // (2-4 tumble and are alpha blended)
 export class Ambient {
   constructor({
@@ -339,6 +340,10 @@ export class Ambient {
             #if SHAPE == 6
               vA = (0.85 + 0.15 * sin(time * 2.0 + aPh * 3.0)) * smoothstep(box.y, box.y * 0.75, p.y) * smoothstep(0.0, 5.0, p.y);
               p.y += 3.0;
+            #elif SHAPE == 7
+              p.x += sin(time * 0.9 + aPh * 2.0) * 0.8;
+              vA = smoothstep(0.0, 1.5, p.y) * smoothstep(box.y, box.y * 0.7, p.y);
+              p.y += 0.6;
             #else
               vA = (0.5 + 0.5 * sin(time * 6.0 + aPh * 3.0)) * smoothstep(box.y, box.y * 0.6, p.y);
             #endif
@@ -423,6 +428,18 @@ export class Ambient {
             float a = max(body * 0.92, flame) * vA;
             if (a < 0.02) discard;
             gl_FragColor = vec4(vC * mix(1.25, 0.7, smoothstep(0.3, -0.3, yy)) + vec3(1.0, 0.85, 0.5) * flame * 1.5, a);
+          #elif SHAPE == 7
+            vec2 q = gl_PointCoord - 0.5;
+            float r = length(q);
+            // a soap bubble: a thin iridescent rim, a faint film, the window highlight up on one side
+            float rim = smoothstep(0.34, 0.46, r) * (1.0 - smoothstep(0.46, 0.5, r));
+            float film = (1.0 - smoothstep(0.44, 0.5, r)) * 0.08;
+            float hl = smoothstep(0.1, 0.0, length(q - vec2(-0.16, -0.17)));
+            float a = (rim * 0.75 + film + hl * 0.9) * vA;
+            if (a < 0.01) discard;
+            float th = atan(q.y, q.x) + vRot * 0.6;
+            vec3 iri = 0.6 + 0.4 * cos(6.2832 * (vec3(0.0, 0.33, 0.67) + th / 6.2832 + r * 1.5));
+            gl_FragColor = vec4(mix(vC * iri, vec3(1.0), hl), a);
           #elif SHAPE == 5
             vec2 q = gl_PointCoord - 0.5;
             float c = cos(vRot * 0.4), s = sin(vRot * 0.4);
