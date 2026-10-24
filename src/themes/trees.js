@@ -623,16 +623,16 @@ export function ginkgoKit() {
   };
 }
 
-// ---------- New York in autumn: London plane street trees, Central Park maples and elms ----------
+// ---------- New York: London plane street trees, Central Park maples and elms (autumn colours unless given others) ----------
 const PLANE = ['#a8983a', '#b89a34', '#9a9a34', '#c0a43e', '#8a9238', '#c8a040'];
 const MAPLE = ['#c8401e', '#d85a1a', '#e8862a', '#b8301e', '#f0a020', '#d0601e'];
 const ELM = ['#c8a030', '#d8b03a', '#b89028', '#e0c040', '#c09a2e'];
-export function parkTreeKit() {
+export function parkTreeKit({ plane = PLANE, maple = MAPLE, elm = ELM } = {}) {
   const bark = std({ map: barkTex(), vertexColors: true, roughness: 0.95 });
   const T = {
-    plane: Array.from({ length: 3 }, () => camphorTemplate(PLANE)),
-    maple: Array.from({ length: 3 }, () => camphorTemplate(MAPLE)),
-    elm: Array.from({ length: 3 }, () => camphorTemplate(ELM)),
+    plane: Array.from({ length: 3 }, () => camphorTemplate(plane)),
+    maple: Array.from({ length: 3 }, () => camphorTemplate(maple)),
+    elm: Array.from({ length: 3 }, () => camphorTemplate(elm)),
   };
   const place = (x, y, z, ry, s) => new THREE.Matrix4().compose(V(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, ry), V(s, s, s));
   const put = (kind, barkCol) => (b, x, z, s = 1, { ry = rand(0, Math.PI * 2), y = 0 } = {}) => {

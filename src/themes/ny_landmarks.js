@@ -1,5 +1,7 @@
-// New York landmark scenes added to Times Square, Liberty and the Brooklyn Bridge: Central Park, Grand Central with the
-// Chrysler Building, the Flatiron by Madison Square, Wall Street, and Coney Island's Wonder Wheel and Cyclone.
+// New York landmark scenes: Central Park (Bow Bridge, Bethesda, rowboats on the Lake, the Plaza Hotel), Grand Central
+// with the Glory of Commerce over its clock and the Chrysler Building across the street, the Flatiron by Madison Square
+// with the Worth obelisk, Wall Street (the Exchange, Federal Hall with Washington, the Charging Bull and the Fearless
+// Girl, Trinity Church), and Coney Island's Wonder Wheel, Cyclone, Parachute Jump and Nathan's.
 import {
   THREE,
   Batcher,
@@ -14,10 +16,12 @@ import {
   rand,
   randi,
   pick,
+  chance,
 } from "../core.js";
 import { at, EDGE, farGround, facadeMat, waterMat, textTex } from "./common.js";
 import { beam } from "./tokyo_kit.js";
 import { tiledBox } from "./beijing_kit.js";
+import { frame, figure, frustum4, chrysler as chryslerTower } from "./ny_icons.js";
 
 // vertical prism over a footprint (x, z pairs, counter-clockwise seen from above) with facade UVs like buildingGeo
 function prismGeo(pts, H, tex, cellW = 1.6, cellH = 3) {
@@ -56,7 +60,7 @@ function prismGeo(pts, H, tex, cellW = 1.6, cellH = 3) {
   return g;
 }
 
-function flagTex() {
+export function flagTex() {
   // the Stars and Stripes
   return canvasTex(
     512,
@@ -161,6 +165,7 @@ export function nyLandmarks(K, ctx) {
     emissive: "#1f3a30",
     emissiveIntensity: 0.8,
   });
+  const polished = std({ color: "#c8a060", roughness: 0.25, metalness: 0.85, emissive: "#3a2a10", emissiveIntensity: 0.5 });
   const darkBronze = std({
     color: "#6a4a2a",
     roughness: 0.35,
@@ -168,6 +173,8 @@ export function nyLandmarks(K, ctx) {
     emissive: "#2a1808",
     emissiveIntensity: 0.6,
   });
+  const plazaWin = windowTex({ wall: "#ece6da", glass: "#141820", lit: ["#ffe0a8", "#fff0d0"], litChance: 0.55, frame: "#f8f4ec", ledge: "#d8d0c0", cols: 8, rows: 16 });
+  const plazaMat = facadeMat(plazaWin, { k: 0.9 });
   const lake = waterMat("#141c34", 8),
     ocean = waterMat("#101a32", 12);
   const lampPost = (b, x, z, side) => {
@@ -484,7 +491,7 @@ export function nyLandmarks(K, ctx) {
     }
     for (let z = 2; z < 30; z += 4.5)
       for (const x of [12, 19]) K.elm(b, x, -z, rand(0.95, 1.15));
-    // autumn trees everywhere else, lampposts, the carriages, people under umbrellas
+    // trees in full leaf everywhere else, lampposts, the carriages, people out for the evening
     for (let i = 0; i < 26; i++) {
       const side = i % 2 ? 1 : -1,
         x = side * rand(11, 34),
@@ -498,8 +505,28 @@ export function nyLandmarks(K, ctx) {
         lampPost(b, side * (EDGE + 1.4), -z, side);
     horse(b, 7.2, -16);
     horse(b, -7.2, -58);
-    K.crowd(b, 4.6, 10, 2, 78, 14, 0.6);
-    K.crowd(b, -4.6, -10, 2, 78, 12, 0.6);
+    K.crowd(b, 4.6, 10, 2, 78, 14);
+    K.crowd(b, -4.6, -10, 2, 78, 12);
+    // rowboats out on the Lake from the boathouse, urns of flowers along Bow Bridge
+    for (const [x, z, a] of [[-26, -34, 0.4], [-34, -52, -0.8], [-48, -40, 1.6], [-28, -66, 2.4], [-54, -70, -0.3]]) {
+      b.add(G.sphLow, VC.solid, x, -0.7, z, 1.3, 0.55, 3.4, 0, a, 0, "#c8b89a");
+      b.add(G.sphLow, VC.solid, x, -0.62, z, 1.1, 0.4, 3.0, 0, a, 0, "#5a3a24");
+      K.person(b, x, z, { seated: true, y: -0.6 });
+      if (chance(0.6)) K.person(b, x + Math.sin(a) * 0.9, z + Math.cos(a) * 0.9, { seated: true, y: -0.6 });
+      for (const e of [-1, 1]) beam(b, VC.solid, x, -0.2, z, x + Math.cos(a) * e * 1.8, -0.8, z - Math.sin(a) * e * 1.8, 0.05, "#8a6a44");
+    }
+    for (let k = 1; k < 8; k++) {
+      const t = k / 8, [x, y, z] = [-31, 1.0 + 2.2 * Math.sin(Math.PI * t), -26 - 48 * t];
+      for (const dx of [-1.6, 1.6]) { b.cyl(VC.solid, "#e6dfcf", x + dx, y + 1.25, z, 0.22, 0.5, "cyl8"); b.sph(VC.solid, pick(["#e83a5a", "#ffd23d", "#c85ad8"]), x + dx, y + 1.6, z, 0.26, true); }
+    }
+    // the Plaza Hotel at the corner of the park: white stone, the green copper mansard with its gables and turrets
+    const PX = -64, PZ = -100;
+    b.addM(buildingGeo(26, 52, 34, plazaWin, 1.5, 3.0), plazaMat, at(PX, 0, PZ), "#ffffff");
+    b.add(G.cone4, VC.solid, PX, 56, PZ, 26 * 1.36, 8, 34 * 1.36, 0, 0, 0, "#3e7a6a");
+    for (const [dx, dz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { b.cyl(VC.solid, "#f2ece2", PX + dx * 12, 54, PZ + dz * 16, 2.2, 6, "cyl8"); b.add(G.cone8, VC.solid, PX + dx * 12, 59, PZ + dz * 16, 5, 4.4, 5, 0, 0, 0, "#3e7a6a"); }
+    for (let k = -2; k <= 2; k++) b.add(G.cone4, VC.solid, PX + 13.2, 55, PZ + k * 6, 1.2, 3, 3.4, 0, 0, 0, "#f2ece2");
+    b.box(VC.glow, hdr("#ffe8c0", 1.6), PX + 13.1, 52.4, PZ, 0.1, 0.5, 33);
+    b.add(G.plane, flagMat, PX + 13.6, 8, PZ + 6, 2, 1.1, 1, 0, Math.PI / 2, 0);
     return b.build();
   };
 
@@ -566,94 +593,7 @@ export function nyLandmarks(K, ctx) {
     rows: 16,
   });
   const chryMat = facadeMat(chryWin, { k: 0.8 });
-  const chrysler = (b, x, z) => {
-    let y = 0;
-    for (const [w, h] of [
-      [34, 24],
-      [28, 40],
-      [22, 44],
-    ]) {
-      b.addM(
-        buildingGeo(w, h, w, chryWin, 1.3, 2.6),
-        chryMat,
-        at(x, y, z),
-        "#ffffff",
-      );
-      y += h;
-    }
-    for (const [dx, dz] of [
-      [-11, -11],
-      [11, -11],
-      [-11, 11],
-      [11, 11],
-    ])
-      b.box(
-        VC.metal,
-        "#c9ced6",
-        x + dx * 0.98,
-        y - 3,
-        z + dz * 0.98,
-        1.6,
-        0.8,
-        1.6,
-      );
-    for (let k = 0; k < 6; k++) {
-      // terraced crown of stainless arches with triangular windows
-      const w = 20 - k * 3.1,
-        h = 5.6;
-      b.add(
-        G.box,
-        VC.metal,
-        x,
-        y + h / 2,
-        z,
-        w,
-        h,
-        w,
-        0,
-        (Math.PI / 4) * (k % 2),
-        0,
-        "#b9bec8",
-      );
-      for (let f = 0; f < 4; f++) {
-        const a = (f * Math.PI) / 2,
-          fx = x + Math.sin(a) * (w / 2 + 0.05),
-          fz = z + Math.cos(a) * (w / 2 + 0.05);
-        for (let j = -1; j <= 1; j++)
-          b.add(
-            G.cone4,
-            VC.glow,
-            fx + Math.cos(a) * j * w * 0.28,
-            y + h * 0.55,
-            fz - Math.sin(a) * j * w * 0.28,
-            0.9,
-            1.6,
-            0.1,
-            0,
-            a,
-            0,
-            hdr("#fff1c4", 2.2),
-          );
-        b.add(
-          G.box,
-          VC.glow,
-          fx,
-          y + h - 0.3,
-          fz,
-          w * 0.9,
-          0.15,
-          0.06,
-          0,
-          a,
-          0,
-          hdr("#fff1c4", 2.0),
-        );
-      }
-      y += h;
-    }
-    b.add(G.cone4, VC.metal, x, y + 13, z, 3.4, 26, 3.4, 0, 0, 0, "#d7dcf0");
-    b.sph(VC.glow, hdr("#ff2a2a", 4), x, y + 26.5, z, 0.35);
-  };
+  const metlife = basic({ map: textTex("MetLife", { w: 1024, h: 192, color: "#6ab0ff", glow: "#2a6aff", font: '"Helvetica Neue", Arial, sans-serif', weight: 700, size: 0.7 }), transparent: true, color: hdr("#ffffff", 1.5) });
   const grandCentral = () => {
     const b = new Batcher();
     for (const side of [-1, 1]) farGround(b, side, "#121116");
@@ -720,11 +660,21 @@ export function nyLandmarks(K, ctx) {
       -Math.PI / 2,
       0,
     );
-    for (const dz of [-5.5, 5.5]) {
-      b.add(G.sph, bronze, fx - 0.5, 26.5, zc + dz, 2.2, 4.6, 2.2);
-      b.sph(bronze, 0xffffff, fx - 0.6, 29.3, zc + dz, 0.8);
+    // the Glory of Commerce on top of the clock: Mercury with his winged helmet, Hercules and Minerva seated either side
+    const c = 0xffffff;
+    const M = figure(frame(b, fx - 0.4, 28, zc, 3.4, Math.PI), lime, c, { arms: "out", cloak: true });
+    for (const e of [-1, 1]) M.add(G.cone4, lime, 0, 1.9, e * 0.15, 0.06, 0.22, 0.14, 0, 0, e * 0.9, c);
+    M.limb(lime, c, [0.05, 0.4, -0.32], [0.08, 1.6, -0.34], 0.025, 0.025, 6);   // the caduceus
+    for (const [e, helmet] of [[1, false], [-1, true]]) {
+      const S = frame(b, fx - 0.6, 28.1, zc - e * 5.2, 3.0, Math.PI);
+      S.limb(lime, c, [0, 0.45, 0], [-0.05, 1.3, e * 0.35], 0.24, 0.2, 8);
+      S.ell(lime, c, -0.05, 1.55, e * 0.45, 0.14, 0.17, 0.14);
+      if (helmet) S.add(G.cone8, lime, -0.05, 1.76, e * 0.47, 0.3, 0.26, 0.3, 0, 0, 0, c);
+      for (const k of [-1, 1]) { S.limb(lime, c, [0, 0.45, k * 0.12], [0.5, 0.48, k * 0.14], 0.12, 0.1, 6); S.limb(lime, c, [0.5, 0.48, k * 0.14], [0.55, -0.1, k * 0.16], 0.09, 0.07, 6); }
+      S.limb(lime, c, [-0.02, 1.2, e * 0.55], [0.3, 0.7, e * 0.75], 0.08, 0.06, 6);
+      if (helmet) S.cyl(lime, c, 0.25, 0.75, -e * 0.25, 0.32, 0.06, "cyl", 0, Math.PI / 2);   // Minerva's shield
+      else S.limb(lime, c, [0.3, 0.7, e * 0.75], [0.35, -0.1, e * 0.8], 0.06, 0.09, 6);   // Hercules' club
     }
-    b.add(G.sph, bronze, fx - 0.4, 30.5, zc, 2.6, 3.4, 2.4);
     for (let k = -4; k <= 4; k++)
       b.box(
         VC.glow,
@@ -744,14 +694,15 @@ export function nyLandmarks(K, ctx) {
       "#a9b8d9",
     );
     b.box(VC.glow, hdr("#e8f4ff", 1.4), fx + 36, 96.2, zc, 26.2, 0.3, 56.2);
+    b.add(G.plane, metlife, fx + 22.9, 90, zc, 24, 4.6, 1, 0, -Math.PI / 2, 0);
     for (let z = 4; z < 78; z += rand(5, 7)) K.taxi(b, EDGE + 2.7, -z);
-    K.crowd(b, 6, 11, 4, 76, 22, 0.6);
+    K.crowd(b, 6, 11, 4, 76, 22);
     // across the street: the Chrysler Building up close, midtown towers around it
     ctx.row(b, -1, 0, 30);
     ctx.row(b, -1, 64, 80);
-    chrysler(b, -30, -48);
+    chryslerTower(b, { x: -30, y: 0, z: -48, s: 0.53, wall: chryMat, tex: chryWin, steel: VC.metal, solid: VC.solid, glow: VC.glow, mc: "#c9ced6", gc: hdr("#fff1c4", 2.2) });
     for (let z = 4; z < 80; z += 16) ctx.lamp(b, -(EDGE + 1.5), -z, -1);
-    K.crowd(b, -4.6, -10, 2, 78, 14, 0.6);
+    K.crowd(b, -4.6, -10, 2, 78, 14);
     return b.build();
   };
 
@@ -767,6 +718,10 @@ export function nyLandmarks(K, ctx) {
     rows: 16,
   });
   const flatMat = facadeMat(flatWin, { k: 0.85 });
+  const flatBase = windowTex({ wall: "#c4b494", glass: "#14161c", lit: ["#ffe0a8", "#fff0d0"], litChance: 0.6, arch: true, frame: "#e0d4bc", ledge: "#9a8a6e", cols: 8, rows: 16 });
+  const flatBaseMat = facadeMat(flatBase, { k: 0.85 });
+  const flatTop = windowTex({ wall: "#bcaa8c", glass: "#14161c", lit: ["#ffe0a8", "#fff4dc"], litChance: 0.5, arch: true, frame: "#e8dcc4", cols: 8, rows: 16 });
+  const flatTopMat = facadeMat(flatTop, { k: 0.85 });
   const metWin = windowTex({
     wall: "#e8e4dc",
     glass: "#14161c",
@@ -780,50 +735,38 @@ export function nyLandmarks(K, ctx) {
   const flatiron = () => {
     const b = new Batcher();
     for (const side of [-1, 1]) farGround(b, side, "#121116");
-    // the wedge, its narrow prow pointing at the runner
-    const foot = [
-      [13, -22],
-      [13, -74],
-      [40, -74],
-      [15, -22],
-    ];
+    // the wedge, its rounded prow pointing at the runner: rusticated limestone base, the shaft with its bays down
+    // Broadway, the arched top floors under the heavy cornice; the glass "cowcatcher" shop at the tip
+    const tip = [];
+    for (let k = 1; k < 6; k++) { const a = (k / 6) * Math.PI; tip.push([14.1 + Math.cos(a) * 1.1, -23.2 + Math.sin(a) * 1.1]); }
+    const foot = [[13, -23.2], [13, -74], [40, -74], [15.2, -23.2], ...tip];
+    const grow = (d) => foot.map(([x, z]) => { const dx = x - 22, dz = z + 52, l = Math.hypot(dx, dz); return [x + (dx / l) * d, z + (dz / l) * d]; });
     const H = 58;
-    b.addM(
-      prismGeo(foot, H, flatWin, 1.6, 3.2),
-      flatMat,
-      at(0, 0, 0),
-      "#ffffff",
-    );
-    b.addM(
-      prismGeo(
-        [
-          [12.6, -21.6],
-          [12.6, -74.4],
-          [40.6, -74.4],
-          [15.4, -21.6],
-        ],
-        1.4,
-        flatWin,
-        1.6,
-        3.2,
-      ),
-      VC.solid,
-      at(0, H, 0),
-      "#a8987e",
-    );
-    b.box(VC.glow, hdr("#ffd9a0", 0.75), 12.95, 2.0, -48, 0.05, 3.4, 50);
-    b.box(VC.glow, hdr("#ffd9a0", 0.75), 14.0, 2.0, -22.05, 2.0, 3.4, 0.05);
+    b.addM(prismGeo(foot, 17, flatBase, 1.6, 3.2), flatBaseMat, at(0, 0, 0), "#ffffff");
+    b.addM(prismGeo(foot, 33, flatWin, 1.6, 3.2), flatMat, at(0, 17, 0), "#ffffff");
+    b.addM(prismGeo(foot, 8, flatTop, 1.6, 3.2), flatTopMat, at(0, 50, 0), "#ffffff");
+    b.addM(prismGeo(grow(0.4), 0.7, flatWin, 1.6, 3.2), VC.solid, at(0, 16.7, 0), "#b8a888");
+    b.addM(prismGeo(grow(0.3), 0.6, flatWin, 1.6, 3.2), VC.solid, at(0, 49.8, 0), "#b8a888");
+    b.addM(prismGeo(grow(0.9), 1.4, flatWin, 1.6, 3.2), VC.solid, at(0, H, 0), "#a8987e");
+    for (let z = -30; z > -72; z -= 8) b.addM(buildingGeo(0.8, 33, 3.0, flatWin, 1.6, 3.2), flatMat, at(12.6, 17, z), "#f4ece0");
+    K.shopWindow(b, 12.95, 2.2, -48, 1, 48, 3.2, "#ffd9a0", 0.5);
+    b.box(VC.glow, hdr("#ffe0b0", 0.75), 14.1, 2.3, -21.6, 2.3, 4.2, 1.3);
+    b.box(VC.solid, "#2a2622", 14.1, 4.55, -21.6, 2.6, 0.5, 1.6);
     for (let k = 0; k < 6; k++)
-      b.box(
-        VC.glow,
-        hdr("#ffe6c0", 2.0),
-        11.6,
-        0.2,
-        -24 - k * 9,
-        0.5,
-        0.3,
-        0.5,
-      );
+      b.box(VC.glow, hdr("#ffe6c0", 2.0), 11.6, 0.2, -24 - k * 9, 0.5, 0.3, 0.5);
+    // the plaza in front of the prow: green umbrellas over the tables, and the Worth monument's obelisk
+    for (let k = 0; k < 4; k++) {
+      const x = 6.2 + (k % 2) * 2.6, z = -4 - k * 4;
+      b.cyl(VC.metal, "#c8ccd0", x, 1.2, z, 0.04, 2.4, "cyl6");
+      b.add(G.cone8, VC.solid, x, 2.5, z, 2.4, 0.55, 2.4, 0, 0, 0, "#2a6a3a");
+      b.cyl(VC.metal, "#3a3a3e", x, 0.38, z, 0.4, 0.06, "cyl8");
+      for (const e of [-0.7, 0.7]) K.person(b, x + e, z, { seated: true, y: 0.42 });
+    }
+    b.block(VC.solid, "#7a766c", 8.2, 0, -14, 2.8, 1.2, 2.8);
+    b.block(VC.solid, "#8a8478", 8.2, 1.2, -14, 2.1, 1.4, 2.1);
+    b.addM(frustum4(0.85, 1.45, 11), VC.solid, at(8.2, 2.6, -14), "#9a948a");
+    b.add(G.cone4, VC.solid, 8.2, 14.2, -14, 1.2, 1.2, 1.2, 0, 0, 0, "#9a948a");
+    for (let k = 0; k < 14; k++) { const a = (k / 14) * Math.PI * 2; b.box(VC.metal, "#1a1a1e", 8.2 + Math.cos(a) * 2.2, 0.5, -14 + Math.sin(a) * 2.2, 0.06, 1.0, 0.06); }
     // Madison Square Park across the street: elms, a lit burger kiosk, the Met Life clock tower behind
     for (let i = 0; i < 12; i++)
       K.elm(b, -rand(12, 30), -rand(4, 76), rand(0.95, 1.2));
@@ -876,8 +819,8 @@ export function nyLandmarks(K, ctx) {
       for (let z = 4; z < 80; z += 16)
         ctx.lamp(b, side * (EDGE + 1.5), -z, side);
     for (let z = 8; z < 72; z += rand(9, 14)) K.taxi(b, -(EDGE + 2.7), -z);
-    K.crowd(b, 5, 10.5, 4, 76, 18, 0.6);
-    K.crowd(b, -5, -10, 4, 76, 12, 0.6);
+    K.crowd(b, 5, 10.5, 4, 76, 18);
+    K.crowd(b, -5, -10, 4, 76, 12);
     return b.build();
   };
 
@@ -950,44 +893,28 @@ export function nyLandmarks(K, ctx) {
     return { top: 2.2 + h, zc, len };
   };
   const bull = (b, x, z) => {
-    // the Charging Bull, head down toward the runner
-    b.block(VC.solid, "#4a4844", x, 0, z, 2.6, 0.3, 5.2);
-    b.add(G.sph, darkBronze, x, 1.75, z - 0.3, 1.6, 1.5, 3.6, -0.15, 0, 0);
-    b.add(G.sph, darkBronze, x, 1.45, z + 1.75, 1.1, 1.1, 1.3, 0.5, 0, 0);
-    for (const sx of [-1, 1]) {
-      b.add(
-        G.cone,
-        darkBronze,
-        x + sx * 0.55,
-        1.95,
-        z + 2.05,
-        0.18,
-        0.9,
-        0.18,
-        0.6,
-        0,
-        sx * 1.1,
-      );
-      for (const [dz, ang] of [
-        [0.9, -0.35],
-        [-1.4, 0.25],
-      ])
-        b.add(
-          G.box,
-          darkBronze,
-          x + sx * 0.5,
-          0.75,
-          z + dz,
-          0.32,
-          1.25,
-          0.36,
-          ang,
-          0,
-          0,
-        );
+    // the Charging Bull, head down and horns out toward the runner, his weight thrown forward, the tail whipped up
+    b.block(VC.solid, "#4a4844", x, 0, z, 2.9, 0.3, 5.8);
+    const F = frame(b, x, 0.3, z, 1, -Math.PI / 2), c = 0xffffff;
+    F.ell(darkBronze, c, 0.2, 1.62, 0, 1.55, 0.82, 0.74);   // the barrel
+    F.ell(darkBronze, c, 1.0, 1.82, 0, 0.88, 0.92, 0.78);   // the shoulders, bunched
+    F.ell(darkBronze, c, -1.25, 1.78, 0, 0.82, 0.84, 0.7);   // the haunches, raised
+    F.limb(darkBronze, c, [1.5, 1.95, 0], [2.35, 1.15, 0], 0.62, 0.44, 10);   // the neck, driven down
+    F.ell(darkBronze, c, 2.6, 0.98, 0, 0.56, 0.36, 0.34);   // the head
+    F.ell(polished, c, 3.0, 0.78, 0, 0.26, 0.22, 0.27, true);   // the muzzle, rubbed bright by the crowds
+    for (const e of [-1, 1]) {
+      F.limb(polished, c, [2.45, 1.22, e * 0.26], [2.6, 1.48, e * 0.82], 0.11, 0.08, 6);   // the horns, out and forward
+      F.limb(polished, c, [2.6, 1.48, e * 0.82], [3.15, 1.44, e * 0.98], 0.08, 0.02, 6);
+      F.limb(darkBronze, c, [1.15, 1.35, e * 0.42], [1.55, 0.7, e * 0.46], 0.25, 0.17, 8);   // the forelegs, braced out in front
+      F.limb(darkBronze, c, [1.55, 0.7, e * 0.46], [1.95, 0.05, e * 0.48], 0.16, 0.12, 8);
+      F.limb(darkBronze, c, [-1.35, 1.4, e * 0.38], [-1.95, 0.75, e * 0.4], 0.3, 0.18, 8);   // the hind legs, pushing off
+      F.limb(darkBronze, c, [-1.95, 0.75, e * 0.4], [-1.85, 0.05, e * 0.42], 0.15, 0.12, 8);
     }
-    beam(b, darkBronze, x, 2.2, z - 2.0, x, 3.0, z - 2.9, 0.12, 0xffffff);
+    F.limb(darkBronze, c, [-1.95, 2.1, 0], [-2.35, 2.7, 0.1], 0.1, 0.07, 6);   // the tail, curling up over his back
+    F.limb(darkBronze, c, [-2.35, 2.7, 0.1], [-1.95, 3.15, 0.3], 0.07, 0.05, 6);
+    F.ell(darkBronze, c, -1.85, 3.25, 0.34, 0.14, 0.2, 0.12, true);
     b.box(VC.glow, hdr("#ffe0b0", 2.0), x + 2, 0.2, z, 0.5, 0.3, 0.5);
+    b.box(VC.glow, hdr("#ffe0b0", 2.0), x - 2, 0.2, z - 2, 0.5, 0.3, 0.5);
   };
   const trinity = (b, x, z) => {
     // Trinity Church: brownstone nave, tower and lit spire
@@ -1124,8 +1051,9 @@ export function nyLandmarks(K, ctx) {
         F.len - 2,
       );
     b.block(VC.solid, "#cfc6b2", -11.6, 0, F.zc, 2.2, 2.6, 2.2);
-    b.add(G.sph, bronze, -11.6, 4.0, F.zc, 1.0, 2.6, 0.9);
-    b.sph(bronze, 0xffffff, -11.6, 5.6, F.zc, 0.32);
+    figure(frame(b, -11.6, 2.6, F.zc, 1.7, 0), darkBronze, 0xffffff, { arms: "out", cloak: true });   // Washington, where he took the oath
+    figure(frame(b, 9.4, 0.12, T.zc + 7, 0.68, 0), darkBronze, 0xffffff, { arms: "hips", skirt: true, hair: true });   // the Fearless Girl, staring down the Exchange
+    b.block(VC.solid, "#6a6660", 9.4, 0, T.zc + 7, 1.1, 0.12, 1.1);
     trinity(b, -24, -70);
     // stock tickers running along the canyon
     for (const side of [-1, 1]) {
@@ -1158,12 +1086,14 @@ export function nyLandmarks(K, ctx) {
     }
     K.nypd(b, EDGE + 2.8, -64);
     K.nypd(b, -(EDGE + 2.8), -24);
-    K.crowd(b, 5, 9.5, 2, 78, 20, 0.6);
-    K.crowd(b, -5, -9.5, 2, 78, 20, 0.6);
+    K.crowd(b, 5, 9.5, 2, 78, 20);
+    K.crowd(b, -5, -9.5, 2, 78, 20);
     return b.build();
   };
 
   // ---------- 康尼岛 ----------
+  const nathans = basic({ map: textTex("NATHAN'S FAMOUS", { w: 1024, h: 192, color: "#ffd23d", bg: "#1f6a3a", border: "#ffd23d", size: 0.56 }), color: hdr("#ffffff", 1.3) });
+  const cycloneSign = basic({ map: textTex("CYCLONE", { w: 1024, h: 256, color: "#ffffff", bg: "#c8202c", border: "#ffffff", size: 0.62 }), color: hdr("#ffffff", 1.25), side: THREE.DoubleSide });
   const planks = plankTex();
   planks.repeat.set(4, 30);
   const boardMat = std({ map: planks, roughness: 0.9 });
@@ -1382,7 +1312,13 @@ export function nyLandmarks(K, ctx) {
     parachute(b, -30, -58);
     // amusement park on the right: arcades and food stands, the Cyclone, the Wonder Wheel
     farGround(b, 1, "#17151a");
-    for (let z = 2; z < 46; z += 9) {
+    // Nathan's Famous on the corner: green and yellow, its sign along the roof, a line at the counter
+    b.block(VC.solid, "#1f6a3a", 18, 0, -8, 14, 5, 12);
+    b.box(VC.solid, "#ffd23d", 10.95, 4.4, -8, 0.1, 1.2, 12);
+    b.add(G.plane, nathans, 10.88, 6.3, -8, 12, 2.4, 1, 0, -Math.PI / 2, 0);
+    K.shopWindow(b, 10.97, 2.0, -8, 1, 10, 2.4, "#fff0c0", 0.7);
+    for (let k = 0; k < 6; k++) K.person(b, 10.2 - (k % 2) * 0.5, -4 - k * 1.3);
+    for (let z = 16; z < 46; z += 9) {
       const zc = -(z + 4);
       b.block(
         VC.solid,
@@ -1431,8 +1367,10 @@ export function nyLandmarks(K, ctx) {
       signPlane(b, 10.9, 5.0, zc, 1, 5, pick([0, 1, 4, 8, 10]));
     }
     cyclone(b, 18, 24, 50, 80);
-    K.crowd(b, -1 - EDGE, -(EDGE + 7), 2, 78, 18, 0.5);
-    K.crowd(b, 5, 10, 2, 78, 16, 0.5);
+    b.add(G.plane, cycloneSign, 15.2, 9, -50, 9, 2.2, 1, 0, -Math.PI / 2, 0);
+    for (const x of [12, 18.4]) b.box(VC.metal, "#d8d2c6", x - 2, 4, -50, 0.2, 8, 0.2);
+    K.crowd(b, -1 - EDGE, -(EDGE + 7), 2, 78, 18);
+    K.crowd(b, 5, 10, 2, 78, 16);
     const g = b.build();
     const wheel = wonderWheel();
     wheel.position.set(38, 24, -34);

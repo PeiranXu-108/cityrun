@@ -158,11 +158,16 @@ const envCache = {},
   weatherCache = {};
 let envId = null,
   weather = [],
-  skylineObj = null;
+  skylineObj = null,
+  sunFollow = false;
+const sunBase = new THREE.Vector3(),
+  _yAxis = new THREE.Vector3(0, 1, 0);
 function applyEnv(id) {
   const t = THEMES[id];
   envId = id;
   sky.apply(t.sky);
+  sunFollow = !!t.sky.follow; // New York's setting sun stays in the street's far gap as the skyline turns
+  sunBase.copy(sky.u.sunDir.value);
   stars.visible = !!t.sky.stars;
   scene.fog.color.set(t.fog.color);
   scene.fog.near = t.fog.near;
@@ -177,7 +182,12 @@ function applyEnv(id) {
   bloom.strength = t.bloom.strength;
   bloom.radius = t.bloom.radius;
   bloom.threshold = t.bloom.threshold;
-  if (!envCache[id]) envCache[id] = pmrem.fromScene(envScene, 0.04).texture;
+  if (!envCache[id]) {
+    // a theme can light its shade from a different sky than the one it shows (New York: blue fill under a sunset)
+    if (t.envSky) sky.apply({ ...t.sky, ...t.envSky });
+    envCache[id] = pmrem.fromScene(envScene, 0.04).texture;
+    if (t.envSky) sky.apply(t.sky);
+  }
   scene.environment = envCache[id];
   weather.forEach((w) => scene.remove(w.obj));
   weather =
@@ -686,6 +696,10 @@ function tick(now) {
       ? Math.atan(camera.position.x / D) -
         Math.atan(curveUniforms.uCurveX.value * D)
       : 0;
+    if (sunFollow)
+      sky.u.sunDir.value
+        .copy(sunBase)
+        .applyAxisAngle(_yAxis, skylineObj.rotation.y);
   }
 
   flash *= Math.exp(-real * 3.2);
