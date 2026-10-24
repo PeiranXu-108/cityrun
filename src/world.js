@@ -33,9 +33,10 @@ import ldn from "./themes/london.js";
 import lj from "./themes/lijiang.js";
 import paris from "./themes/paris.js";
 import hk from "./themes/hongkong.js";
+import taipei from "./themes/taipei.js";
 
-export const THEMES = { ny, pgh, hz, bj, tokyo, syd, ldn, lj, paris, hk };
-export const THEME_ORDER = ["ny", "pgh", "hz", "bj", "tokyo", "syd", "ldn", "lj", "paris", "hk"];
+export const THEMES = { ny, pgh, hz, bj, tokyo, syd, ldn, lj, paris, hk, taipei };
+export const THEME_ORDER = ["ny", "pgh", "hz", "bj", "tokyo", "syd", "ldn", "lj", "paris", "hk", "taipei"];
 export const TOUR_LEN = CHUNK_LEN * 15;
 // The World Tour visits every city once in a random order, then shuffles again; never the same city twice in a row.
 function tourOrder(prev) {

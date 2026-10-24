@@ -400,6 +400,29 @@ export function barrierStyle({
 
 // ---------- coins ----------
 export function coinGeometry(kind) {
+  if (kind === "boba") {
+    // a bubble-tea coin: the cup punched through it under its domed lid, the straw stuck in at a slant, and the pearls
+    // left standing in the bottom of the window
+    const s = new THREE.Shape();
+    s.absarc(0, 0, 0.43, 0, Math.PI * 2, false);
+    const cup = new THREE.Path(), pts = [[-0.125, -0.27], [0.125, -0.27], [0.165, 0.115]];
+    const lid = (a) => [0.18 * Math.cos(a), 0.13 + 0.08 * Math.sin(a)];
+    for (let i = 0; i <= 6; i++) pts.push(lid((i / 6) * 1.2));
+    pts.push([0.1, 0.37], [0.062, 0.376], lid(1.4));
+    for (let i = 1; i <= 8; i++) pts.push(lid(1.4 + (i / 8) * (Math.PI - 1.4)));
+    pts.push([-0.165, 0.115]);
+    pts.forEach(([x, y], i) => (i ? cup.lineTo(x, y) : cup.moveTo(x, y)));
+    cup.closePath();
+    s.holes.push(cup);
+    const shapes = [s];
+    for (const [x, y] of [[-0.08, -0.232], [-0.026, -0.232], [0.028, -0.232], [0.082, -0.232], [-0.054, -0.176], [0.002, -0.176], [0.058, -0.176]]) {
+      const p = new THREE.Shape(); p.absarc(x, y, 0.024, 0, Math.PI * 2, false); shapes.push(p);
+    }
+    const g = new THREE.ExtrudeGeometry(shapes, { depth: 0.07, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.006, bevelSegments: 2, curveSegments: 24 });
+    g.translate(0, 0, -0.035);
+    return g;
+  }
+
   if (kind === "bauhinia") {
     // a Hong Kong two-dollar coin: the scalloped edge, the bauhinia punched through it, five petals swirling round
     const s = new THREE.Shape();

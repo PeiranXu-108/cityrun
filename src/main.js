@@ -39,6 +39,7 @@ import { World, THEMES, THEME_ORDER } from "./world.js";
 import { GLYPHS } from "./themes/tokyo.js";
 import { GLYPHS as BJ_GLYPHS } from "./themes/beijing.js";
 import { GLYPHS as HK_GLYPHS } from "./themes/hongkong_kit.js";
+import { GLYPHS as TP_GLYPHS } from "./themes/taipei_kit.js";
 import { POWERUPS } from "./props.js";
 import { Run } from "./game.js";
 import { audio } from "./audio.js";
@@ -858,6 +859,15 @@ async function boot() {
     const hkReady = new Promise((r) => { hkCss.onload = hkCss.onerror = r; });
     document.head.appendChild(hkCss);
     fonts.push(hkReady.then(() => Promise.all(['900 40px "Chiron Sung HK"', '700 40px "Chiron Hei HK"', '900 40px "Chiron Hei HK"', '700 40px "LXGW WenKai TC"'].map((f) => document.fonts.load(f, hkText)))));
+    // Taipei's: Taiwan's own glyph forms in Noto Sans TC and Noto Serif TC, justfont's rounded Huninn for the tea shops and
+    // the market, Iansui's brush hand for the temples
+    const tpText = [...new Set(TP_GLYPHS + "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 &'·%.,/É★♨")].join("");
+    const tpCss = document.createElement("link");
+    tpCss.rel = "stylesheet";
+    tpCss.href = `https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700;900&family=Noto+Serif+TC:wght@900&family=Huninn&family=Iansui&text=${encodeURIComponent(tpText)}&display=swap`;
+    const tpReady = new Promise((r) => { tpCss.onload = tpCss.onerror = r; });
+    document.head.appendChild(tpCss);
+    fonts.push(tpReady.then(() => Promise.all(['900 40px "Noto Sans TC"', '700 40px "Noto Sans TC"', '900 40px "Noto Serif TC"', '400 40px "Huninn"', '400 40px "Iansui"'].map((f) => document.fonts.load(f, tpText)))));
     await Promise.race([
       Promise.all(fonts),
       new Promise((r) => setTimeout(r, 2500)),

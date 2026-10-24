@@ -1224,3 +1224,87 @@ export function hongkongTreeKit() {
     petals,
   };
 }
+
+// ---------- Taipei: the Taiwan golden-rain tree, banyans, royal palms and camphors ----------
+const LUAN = ['#3e6e32', '#4a7c38', '#36622c', '#567e3c', '#44743a'];
+function luanTex() {   // 台灣欒樹 in October: bipinnate leaves, panicles of tiny yellow flowers and the first rose-red papery capsules
+  return canvasTex(128, 128, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    for (let i = 0; i < 16; i++) {   // leaf sprays: a midrib and its small toothed leaflets
+      const x = rand(10, 118), y = rand(10, 118), a = rand(0, 6.28), len = rand(14, 22);
+      g.save(); g.translate(x, y); g.rotate(a);
+      g.strokeStyle = '#3a5a26'; g.lineWidth = 1; g.beginPath(); g.moveTo(0, 0); g.lineTo(len, 0); g.stroke();
+      for (let k = 2; k < len; k += 3.2) for (const e of [-1, 1]) { g.fillStyle = pick(LUAN); g.beginPath(); g.ellipse(k, e * 2.6, 2.6, 1.3, e * 0.5, 0, Math.PI * 2); g.fill(); }
+      g.restore();
+    }
+    const panicle = (cx, cy, r, cols) => { for (let k = 0; k < 46; k++) { const a = rand(0, 6.28), d = Math.pow(Math.random(), 0.6) * r; g.fillStyle = pick(cols); g.beginPath(); g.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d * 1.3, rand(1.1, 2.0), 0, Math.PI * 2); g.fill(); } };
+    for (const [x, y] of [[28, 26], [92, 22], [60, 52], [104, 74]]) panicle(x + rand(-4, 4), y + rand(-4, 4), rand(11, 15), ['#ffd23a', '#ffe060', '#f4c020', '#fff0a0']);
+    const capsules = (cx, cy, r) => {   // the capsules: three-sided paper lanterns, coral to rose
+      for (let k = 0; k < 9; k++) {
+        const x = cx + rand(-r, r), y = cy + rand(-r, r), s = rand(3, 4.6);
+        g.fillStyle = pick(['#e8606a', '#f07a6a', '#d84a5a', '#f49a84', '#c83a4a']);
+        g.beginPath(); g.moveTo(x, y - s); g.quadraticCurveTo(x + s, y - s * 0.2, x, y + s); g.quadraticCurveTo(x - s, y - s * 0.2, x, y - s); g.fill();
+        g.strokeStyle = 'rgba(120,20,30,0.5)'; g.lineWidth = 0.6; g.beginPath(); g.moveTo(x, y - s); g.lineTo(x, y + s); g.stroke();
+      }
+    };
+    for (const [x, y] of [[30, 84], [76, 100], [16, 54], [86, 46]]) capsules(x, y, 9);
+  }, { repeat: false });
+}
+function luanCarpetTex() {   // the "golden rain": tiny yellow flowers fallen round the tree, a few capsules among them
+  return canvasTex(256, 256, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    for (let i = 0; i < 900; i++) {
+      const a = Math.random() * Math.PI * 2, r = Math.pow(Math.random(), 0.65) * 122;
+      g.fillStyle = Math.random() < 0.9 ? pick(['#ffd23a', '#ffe060', '#f4c020', '#e8b020']) : pick(['#e8606a', '#d84a5a']);
+      g.beginPath(); g.arc(w / 2 + Math.cos(a) * r, h / 2 + Math.sin(a) * r, rand(1, 2.2), 0, Math.PI * 2); g.fill();
+    }
+  }, { repeat: false });
+}
+function luanTemplate() {   // a straight trunk, limbs rising into a broad round crown
+  const wood = [], L = new Leaves();
+  const r = rand(0.17, 0.22), top = V(rand(-0.2, 0.2), rand(2.4, 2.9), rand(-0.2, 0.2)), tint = () => new THREE.Color('#ffffff').multiplyScalar(rand(0.85, 1.05));
+  limb(wood, V(0, -0.2, 0), top, r * 1.25, r * 0.85); joint(wood, top, r * 0.86);
+  const nB = randi(5, 6);
+  for (let i = 0; i < nB; i++) {
+    const az = (i / nB) * Math.PI * 2 + rand(-0.3, 0.3), d = V(Math.cos(az) * 0.8, 1.2, Math.sin(az) * 0.8).normalize();
+    let p = top.clone(), br = r * 0.62;
+    for (let k = 0; k < 3; k++) {
+      d.y -= 0.12; d.normalize();
+      const q = p.clone().addScaledVector(d, rand(0.9, 1.3) * (1 - k * 0.1));
+      limb(wood, p, q, br, br * 0.68, 6);
+      for (let j = 0; j < (k ? 4 : 1); j++) card(L, p.clone().lerp(q, Math.random()).add(V(rand(-0.5, 0.5), rand(0, 0.5), rand(-0.5, 0.5))), rand(1.1, 1.5), tint());
+      p = q; br *= 0.68;
+    }
+    for (let j = 0; j < 4; j++) card(L, p.clone().add(V(rand(-0.7, 0.7), rand(-0.2, 0.5), rand(-0.7, 0.7))), rand(1.2, 1.6), tint());
+  }
+  for (let k = 0; k < 30; k++) {   // the dome of the crown
+    const a = rand(0, Math.PI * 2), rr = Math.sqrt(Math.random()) * 2.8;
+    card(L, V(top.x + Math.cos(a) * rr, top.y + 2.2 + rand(-0.5, 0.7) - rr * 0.32, top.z + Math.sin(a) * rr), rand(1.2, 1.6), tint());
+  }
+  return { wood: mergeGeometries(wood), leaves: L.geometry() };
+}
+const TP_CAMPHOR = ['#244a2a', '#2e5a32', '#22422a', '#3a6a3a', '#2a5030'];
+export function taipeiTreeKit() {
+  const bark = std({ map: barkTex(), vertexColors: true, roughness: 0.95 });
+  const bloom = foliageMat(luanTex(), { sway: 0.06, alphaTest: 0.5, emissive: 0.16 });
+  const frond = foliageMat(frondTex(), { sway: 0.2, alphaTest: 0.45 });
+  const ct = luanCarpetTex();
+  const carpet = std({ map: ct, alphaTest: 0.4, roughness: 0.6, emissive: '#ffffff', emissiveMap: ct, emissiveIntensity: 0.18 });
+  const T = { luan: Array.from({ length: 4 }, luanTemplate), banyan: Array.from({ length: 3 }, banyanTemplate), palm: Array.from({ length: 3 }, royalPalmTemplate), camphor: Array.from({ length: 3 }, () => camphorTemplate(TP_CAMPHOR)) };
+  const place = (x, y, z, ry, s) => new THREE.Matrix4().compose(V(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, ry), V(s, s, s));
+  const flowers = (b, x, z, size, y = 0) => b.add(G.plane, carpet, x, y + 0.035, z, size, size, 1, -Math.PI / 2, rand(0, Math.PI), 0);
+  return {
+    luan(b, x, z, s = 1, { ry = rand(0, Math.PI * 2), y = 0, carpet: c = true } = {}) {
+      const t = pick(T.luan), m = place(x, y, z, ry, s * 1.3);
+      b.addM(t.wood, bark, m, '#6a6258'); b.addM(t.leaves, bloom, m, null);
+      if (c) flowers(b, x, z, 6 * s, y);
+    },
+    banyan(b, x, z, s = 1, { ry = rand(0, Math.PI * 2), y = 0 } = {}) { const t = pick(T.banyan), m = place(x, y, z, ry, s); b.addM(t.wood, bark, m, '#8a8274'); b.addM(t.canopy, VC.solid, m, null); },
+    palm(b, x, z, s = 1, { ry = rand(0, Math.PI * 2), y = 0 } = {}) {
+      const t = pick(T.palm), m = place(x, y, z, ry, s);
+      b.addM(t.wood, bark, m, '#b8b4ac'); b.addM(t.shaft, VC.solid, m, null); b.addM(t.leaves, frond, m, null);
+    },
+    camphor(b, x, z, s = 1, { ry = rand(0, Math.PI * 2), y = 0 } = {}) { const t = pick(T.camphor), m = place(x, y, z, ry, s * 1.3); b.addM(t.wood, bark, m, '#7a6e5e'); b.addM(t.canopy, VC.solid, m, null); },
+    flowers,
+  };
+}

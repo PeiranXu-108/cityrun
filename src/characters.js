@@ -27,12 +27,15 @@ export const CHARACTERS = [
     skin: '#f0cca8', top: '#f4f2ec', pants: '#1a2440', shoes: '#141414', sole: '#ff6aa8', hat: '#c8202c', hair: '#5a3220', accent: '#ff6aa8', pack: '#1a2a5a', trail: '#ff6aa8' },
   { id: 'lion', name: '醒狮', en: 'LION DANCER', price: 5500, desc: '舞南狮的香港少年，顶着红金狮头：额上一面镜子、一双大眼、白绒绒的狮毛和独角，身后披着狮被，跑起来狮口一张一合', style: 'lion',
     skin: '#e8c4a0', top: '#d8202a', pants: '#f2c230', shoes: '#1a1a1e', sole: '#ffd166', hat: '#d8202a', hair: '#f6f4ee', accent: '#ffd166', pack: '#d8202a', trail: '#ff3d7f' },
+  { id: 'nezha', name: '电音三太子', en: 'NEON NEZHA', price: 6000, desc: '台湾庙会里跳电音舞的三太子：大大的娃娃头戴着墨镜、含着奶嘴，头顶两个发髻，金甲红肚兜，飘着混天绫，脚踩一对呼呼转的风火轮', style: 'nezha',
+    skin: '#f8e0cc', top: '#f2b830', pants: '#c8202a', shoes: '#1a1a1e', sole: '#ff7a1a', hat: '#141414', hair: '#141414', accent: '#ffd166', pack: '#e8202a', trail: '#ff9a2a' },
 ];
 // triangular pennant for the opera general's back flags (靠旗)
 const FLAG = new THREE.BufferGeometry();
 FLAG.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, -0.34, 0, 0.26, -0.17, 0], 3));
 FLAG.computeVertexNormals();
 const EAR = new THREE.ConeGeometry(0.5, 1, 4);
+const TOR = new THREE.TorusGeometry(0.5, 0.12, 8, 28);
 
 const RB = new RoundedBoxGeometry(1, 1, 1, 2, 0.22);
 const BOX = new THREE.BoxGeometry(1, 1, 1);
@@ -60,7 +63,7 @@ function part(geo, mat, x, y, z, sx, sy, sz, parent) {
 const grp = (parent, x = 0, y = 0, z = 0) => { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; };
 
 export function buildCharacter(d) {
-  const robot = d.style === 'robot', panda = d.style === 'panda', guard = d.style === 'guard', neko = d.style === 'neko', rabbit = d.style === 'rabbit', liberty = d.style === 'liberty', koala = d.style === 'koala', guardsman = d.style === 'guardsman', naxi = d.style === 'naxi', paris = d.style === 'paris', lion = d.style === 'lion';
+  const robot = d.style === 'robot', panda = d.style === 'panda', guard = d.style === 'guard', neko = d.style === 'neko', rabbit = d.style === 'rabbit', liberty = d.style === 'liberty', koala = d.style === 'koala', guardsman = d.style === 'guardsman', naxi = d.style === 'naxi', paris = d.style === 'paris', lion = d.style === 'lion', nezha = d.style === 'nezha';
   const root = new THREE.Group();
   const body = grp(root, 0, 0.6, 0);         // roll / lean pivot
   const inner = grp(body, 0, -0.6, 0);
@@ -81,11 +84,18 @@ export function buildCharacter(d) {
     return { thigh, knee, foot };
   };
   const L = leg(-1), R = leg(1);
+  const spin = [];
+  if (nezha) for (const F of [L, R]) {   // 風火輪: a wheel of fire under each foot
+    const w = grp(F.foot, 0, -0.05, -0.07);
+    part(TOR, E('#ff6a1a', 2.4), 0, 0, 0, 0.44, 0.44, 0.44, w).rotation.y = Math.PI / 2;
+    for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2, f = part(CONE, E(k % 2 ? '#ffd23d' : '#ff3a1a', 2.6), 0, Math.cos(a) * 0.27, Math.sin(a) * 0.27, 0.07, 0.16, 0.07, w); f.rotation.x = a - Math.PI / 2; }
+    spin.push(w);
+  }
 
   const torso = grp(hips, 0, 0, 0);
   let tail = null;
   part(RB, mTop, 0, 0.32, guard ? 0.03 : 0, 0.52 * wide, 0.62, guard ? 0.4 : 0.3, torso);
-  if (!panda && !guard && !neko && !rabbit && !liberty && !koala && !guardsman && !naxi && !paris && !lion) part(BOX, E(d.accent, 2.6), 0, 0.38, -0.152, 0.53, 0.05, 0.012, torso);
+  if (!panda && !guard && !neko && !rabbit && !liberty && !koala && !guardsman && !naxi && !paris && !lion && !nezha) part(BOX, E(d.accent, 2.6), 0, 0.38, -0.152, 0.53, 0.05, 0.012, torso);
   if (robot) {
     part(SPH, E(d.accent, 3), 0, 0.42, -0.16, 0.14, 0.14, 0.05, torso);
   }
@@ -128,6 +138,18 @@ export function buildCharacter(d) {
     part(BOX, M(d.pack, 0.7), 0, 0.28, 0.2, 0.62, 0.74, 0.04, torso);                  // the lion's body cloth down his back
     for (let k = 0; k < 9; k++) part(SPH, gold, -0.2 + (k % 3) * 0.2, 0.5 - Math.floor(k / 3) * 0.2, 0.225, 0.11, 0.09, 0.02, torso);   // its gold scales
     for (let k = 0; k < 6; k++) part(SPH, fur, -0.27 + k * 0.108, -0.1, 0.22, 0.12, 0.12, 0.08, torso);   // and the white fringe on its hem
+  } else if (nezha) {
+    const gold = M(d.accent, 0.3, 0.7);
+    part(RB, M(d.pack, 0.6), 0, 0.34, -0.14, 0.4, 0.42, 0.06, torso);                  // the red belly apron
+    part(BOX, gold, 0, 0.55, -0.172, 0.4, 0.04, 0.02, torso);
+    part(SPH, gold, 0, 0.32, -0.18, 0.12, 0.12, 0.03, torso);                          // its gilded medallion
+    for (const sx of [-1, 1]) part(SPH, gold, sx * 0.3, 0.56, 0, 0.24, 0.14, 0.32, torso);   // the armour's shoulder plates
+    part(BOX, gold, 0, 0.06, 0, 0.56, 0.1, 0.34, torso);                               // the belt
+    part(TOR, gold, 0, 0.34, 0, 0.84, 0.84, 0.7, torso).rotation.set(1.35, 0.15, 0.75);   // the Universe Ring slung across him like a bandolier
+    tail = grp(torso, 0, 0.55, 0.18);                                                    // the Red Armillary Sash, streaming behind (the Animator flaps it)
+    const sash = M(d.pack, 0.6);
+    part(TOR, sash, 0, 0.1, 0.04, 0.9, 0.5, 0.5, tail).rotation.x = Math.PI / 2;
+    for (const sx of [-1, 1]) { part(BOX, sash, sx * 0.24, -0.22, 0.16, 0.09, 0.52, 0.025, tail).rotation.set(-0.5, 0, sx * 0.22); part(BOX, sash, sx * 0.33, -0.58, 0.36, 0.08, 0.42, 0.025, tail).rotation.set(-0.95, 0, sx * 0.3); }
   } else if (koala) {
     part(RB, M(d.pack, 0.8), 0, 0.32, -0.12, 0.36, 0.44, 0.1, torso);                 // pale chest fur
   } else if (liberty) {
@@ -173,6 +195,22 @@ export function buildCharacter(d) {
     part(RB, red, 0, -0.04, -0.2, 0.46, 0.1, 0.42, jaw);
     for (let k = 0; k < 5; k++) part(SPH, fur, -0.18 + k * 0.09, -0.11, -0.36, 0.11, 0.12, 0.09, jaw);   // the beard
     part(BOX, M('#f4f4ee', 0.4), 0, 0.02, -0.38, 0.32, 0.03, 0.03, jaw);
+  } else if (nezha) {   // the big doll's head of the festival costume: porcelain face, sunglasses and a pacifier, two buns of black hair
+    const dark = M('#0a0a0e', 0.15, 0.6), gold = M(d.accent, 0.3, 0.7), hair = M(d.hair, 0.7);
+    part(SPH, mSkin, 0, 0.3, 0, 0.62, 0.6, 0.58, head);
+    part(SPH, hair, 0, 0.42, 0.06, 0.64, 0.48, 0.6, head);                              // the hair over the crown and the back
+    part(BOX, gold, 0, 0.46, -0.24, 0.42, 0.05, 0.08, head);                            // the gold band across the brow
+    part(SPH, M('#e8202a', 0.4), 0, 0.4, -0.29, 0.05, 0.08, 0.02, head);                // the red mark between the brows
+    for (const sx of [-1, 1]) {
+      part(SPH, hair, sx * 0.17, 0.7, 0.02, 0.2, 0.2, 0.2, head);                       // the two buns
+      part(CYL, M(d.pack, 0.6), sx * 0.17, 0.6, 0.02, 0.15, 0.06, 0.15, head);          // tied with red ribbon
+      part(RB, dark, sx * 0.11, 0.3, -0.27, 0.17, 0.1, 0.05, head);                     // the sunglasses
+      part(BOX, E('#8ad8ff', 1.4), sx * 0.13, 0.32, -0.296, 0.05, 0.02, 0.005, head);   // a glint on each lens
+      part(SPH, M('#ff8a9a', 0.7), sx * 0.19, 0.18, -0.24, 0.1, 0.07, 0.04, head);      // rosy cheeks
+    }
+    part(BOX, dark, 0, 0.31, -0.28, 0.08, 0.025, 0.02, head);                           // the bridge of the glasses
+    part(SPH, M('#5ac8ff', 0.4), 0, 0.12, -0.285, 0.12, 0.08, 0.03, head);              // the pacifier's shield
+    part(TOR, M('#ff6aa8', 0.4), 0, 0.09, -0.31, 0.1, 0.1, 0.1, head);                  // and its ring
   } else if (robot) {
     part(RB, M(d.top, 0.25, 0.8), 0, 0.18, 0, 0.36, 0.34, 0.33, head);
     part(BOX, E(d.accent, 3.2), 0, 0.2, -0.166, 0.3, 0.09, 0.01, head);
@@ -301,7 +339,8 @@ export function buildCharacter(d) {
   if (panda) {
     AL.sh.children[0].material = M('#1b1b1f'); AR.sh.children[0].material = M('#1b1b1f');
   }
-  return { root, body, inner, hips, torso, head, tail, L, R, AL, AR, def: d };
+  if (nezha) for (const A of [AL, AR]) part(CYL, M(d.accent, 0.3, 0.7), 0, -0.22, 0, 0.16, 0.08, 0.16, A.el);   // gold bracelets
+  return { root, body, inner, hips, torso, head, tail, L, R, AL, AR, spin, def: d };
 }
 
 // Pose solver for the procedural rigs.
@@ -344,6 +383,7 @@ export class Animator {
         if (r.def.style === 'neko') { const w = Math.sin(t * 5); P.aL = -2.7 + w * 0.3; P.eL = 1.0 + w * 0.45; P.zL = -0.2; }   // beckoning paw
         if (r.def.style === 'liberty') { P.aR = -2.95; P.eR = 0.1; P.zR = 0.1; }   // torch raised
         if (r.def.style === 'guardsman') { P.aL = 0.02; P.aR = 0.02; P.eL = 0.12; P.eR = 0.12; P.zL = -0.06; P.zR = 0.06; P.hy = 0; P.bob = 0; }   // standing to attention
+        if (r.def.style === 'nezha') { const w = Math.sin(t * 8); P.aL = -1.4 - w; P.aR = -1.4 + w; P.eL = 1.2; P.eR = 1.2; P.zL = -0.45; P.zR = 0.45; P.hy = Math.sin(t * 4) * 0.35; P.bob = Math.abs(w) * 0.05; P.tz = Math.sin(t * 4) * 0.12; }   // the Neon Gods' techno dance
       }
     }
     const k = 1 - Math.exp(-dt * (s.mode === 'run' ? 30 : 16));
@@ -359,6 +399,7 @@ export class Animator {
     r.head.rotation.y = c.hy;
     r.inner.position.y = -0.6 + c.bob;
     if (r.tail) r.tail.rotation.x = 0.35 + Math.sin(this.ph * 2) * 0.25;
+    if (r.spin) for (const w of r.spin) w.rotation.x -= dt * 14;
     // roll / flips / lean on the pivot
     if (s.mode === 'roll') this.roll -= dt * 15;
     else if (s.flip !== undefined && s.flip > 0) this.roll = -s.flip * Math.PI * 2;

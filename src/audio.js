@@ -532,6 +532,50 @@ class Engine {
     }
   }
 
+  // ---------- Taipei: a temple festival's suona, beiguan drums and firecrackers, a rave's supersaws ----------
+  suona(t, m, dur, v = 0.05, slide = 1.5) {   // 嗩吶: a double reed in a brass bell, loud and nasal, bending up into its notes
+    const g = this.gain(this.music);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.03);
+    g.gain.setValueAtTime(v * 0.85, t + dur * 0.8); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    g.connect(this.send);
+    const f1 = this.filt('bandpass', 1500, 1.6, g), f2 = this.filt('bandpass', 3100, 2.4, this.gain(g, 0.6)), lp = this.filt('lowpass', 4200, 0.8, this.gain(g, 0.35));
+    const lfo = this.ctx.createOscillator(); lfo.frequency.value = 6.4;
+    const lg = this.ctx.createGain(); lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(mtof(m) * 0.018, t + Math.min(0.3, dur * 0.7));
+    lfo.connect(lg); lfo.start(t); lfo.stop(t + dur);
+    for (const [type, det] of [['sawtooth', 0], ['square', 9]]) {
+      const o = this.ctx.createOscillator(); o.type = type; o.detune.value = det;
+      o.frequency.setValueAtTime(mtof(m - slide), t); o.frequency.exponentialRampToValueAtTime(mtof(m), t + 0.07);
+      o.connect(f1); o.connect(f2); o.connect(lp); lg.connect(o.frequency); o.start(t); o.stop(t + dur + 0.05);
+    }
+  }
+  tonggu(t, v = 0.3) {   // 通鼓: the beiguan band's barrel drum, a round boom and the slap of the stick
+    const g = this.gain(this.music); this.env(g, t, 0.002, v, 0.32);
+    const o = this.osc('sine', 190, t, 0.36, g); o.frequency.exponentialRampToValueAtTime(105, t + 0.12);
+    const g2 = this.gain(this.music); this.env(g2, t, 0.001, v * 0.45, 0.05);
+    this.noiseSrc(t, 0.08, this.filt('bandpass', 1800, 1.2, g2));
+  }
+  firecrackers(t, dur = 1, v = 0.15, out = this.music) {   // 鞭炮: a string of crackers going off, sharp cracks one after another
+    for (let tt = t; tt < t + dur; tt += 0.018 + Math.random() * 0.05) {
+      const g = this.gain(out); this.env(g, tt, 0.0008, v * (0.4 + Math.random() * 0.6), 0.02 + Math.random() * 0.035);
+      this.noiseSrc(tt, 0.07, this.filt('bandpass', 1800 + Math.random() * 3400, 0.9, g));
+    }
+  }
+  supersaw(t, chord, dur, v = 0.025, cut = 2400) {   // a trance supersaw: detuned saws through a low-pass closing after the hit
+    const g = this.gain(this.music); this.env(g, t, 0.004, v, dur);
+    g.connect(this.send);
+    const f = this.filt('lowpass', cut, 1.2, g);
+    f.frequency.setValueAtTime(cut * 2.2, t); f.frequency.exponentialRampToValueAtTime(cut * 0.6, t + dur);
+    chord.forEach((m) => [-14, -5, 5, 14].forEach((d) => { const o = this.osc('sawtooth', mtof(m), t, dur, f); o.detune.value = d; }));
+  }
+  truckTone(t, m, dur, v = 0.07, out = this.sfx) {   // a cheap electronic tone through a truck's horn speaker, wobbling a little
+    const g = this.gain(out); this.env(g, t, 0.006, v, dur);
+    const bp = this.filt('bandpass', 1900, 0.8, g);
+    const o = this.osc('square', mtof(m), t, dur, bp);
+    this.osc('triangle', mtof(m + 12), t, dur, this.gain(bp, 0.4));
+    const lfo = this.ctx.createOscillator(); lfo.frequency.value = 5.2; const lg = this.ctx.createGain(); lg.gain.value = mtof(m) * 0.004;
+    lfo.connect(lg); lg.connect(o.frequency); lfo.start(t); lfo.stop(t + dur + 0.05);
+  }
+
   // ---------- sound effects (sfx bus) ----------
   fx(fn) { if (this.ctx && this.sfxOn && this.ctx.state === 'running') try { fn(this.t); } catch (e) { /* ignore */ } }
   tone(t, type, f0, f1, dur, v, out = this.sfx) {
@@ -633,6 +677,22 @@ class Engine {
         o.frequency.exponentialRampToValueAtTime(f * 0.8, t + dd + dur);
       }
     });
+  }
+  // Taipei: the garbage truck coming round the corner playing Für Elise through its loudspeaker, a little tinny
+  furElise() {
+    this.fx((t) => {
+      const N = [[76, 1], [75, 1], [76, 1], [75, 1], [76, 1], [71, 1], [74, 1], [72, 1], [69, 2, [45, 52, 57]], [0, 1], [60, 1], [64, 1], [69, 1], [71, 2, [40, 52, 56]], [0, 1], [64, 1], [68, 1], [71, 1], [72, 3, [45, 52, 57]]];
+      let d = 0; const q = 0.14;
+      for (const [m, len, lh] of N) {
+        if (m) this.truckTone(t + d, m, len * q * 0.95, 0.22);
+        if (lh) lh.forEach((n, i) => this.truckTone(t + d + i * q, n + 12, q * 0.9, 0.09));   // the left hand's arpeggio
+        d += len * q;
+      }
+    });
+  }
+  // a garbage truck coming down the line: the first bars of its tune
+  garbageTruck() {
+    this.fx((t) => [[76, 1], [75, 1], [76, 1], [75, 1], [76, 1], [71, 1], [74, 1], [72, 1], [69, 3]].reduce((d, [m, len]) => { this.truckTone(t + d, m, len * 0.13 * 0.95, 0.2); return d + len * 0.13; }, 0));
   }
   // a ding-ding coming down the line: the driver stamps on the bell twice
   tramBell() { this.fx((t) => { this.tramBellAt(t); this.tramBellAt(t + 0.26); }); }
@@ -809,7 +869,61 @@ const HK_BASS = { 0: [0, 2], 3: [12, 1], 4: [0, 1], 6: [7, 1], 8: [0, 2], 10: [1
 const HK_A = [[0, 69, 3], [3, 72, 1], [4, 76, 4], [8, 74, 2], [10, 72, 2], [12, 69, 4], [16, 71, 3], [19, 68, 1], [20, 71, 2], [22, 74, 2], [24, 76, 6], [30, 74, 2]];
 const HK_B = [[0, 76, 3], [3, 79, 1], [4, 81, 4], [8, 79, 2], [10, 76, 2], [12, 74, 4], [16, 74, 2], [18, 72, 2], [20, 70, 2], [22, 72, 2], [24, 67, 4], [28, 64, 4]];
 
+// Taipei: a temple festival rave (台式電音), the music the Electric-Techno Neon Gods dance to. Each cycle opens with the suona
+// blaring a fanfare over the beiguan drum and cymbals; firecrackers go off into the drop (four on the floor, a rolling
+// off-beat bass, claps) where the suona takes the tune; the drums and gongs have a break to themselves; then the last drop
+// with the supersaws, and firecrackers again to turn the cycle. D minor: Dm - B♭ - C - Am.
+const TP_ROOT = [38, 34, 36, 33];
+const TP_CH = [[62, 65, 69], [58, 62, 65], [60, 64, 67], [57, 60, 64]];
+const TP_FAN = [[[0, 74, 8], [8, 77, 4], [12, 79, 4]], [[0, 81, 12], [12, 79, 4]], [[0, 77, 8], [8, 74, 8]], [[0, 72, 4], [4, 74, 4]]];
+const TP_A = [[0, 74, 3], [3, 77, 1], [4, 79, 2], [6, 77, 2], [8, 74, 4], [12, 72, 2], [14, 69, 2], [16, 67, 2], [18, 69, 2], [20, 74, 4], [24, 72, 3], [27, 69, 1], [28, 67, 4]];
+const TP_B = [[0, 79, 3], [3, 81, 1], [4, 84, 2], [6, 81, 2], [8, 79, 4], [12, 77, 2], [14, 79, 2], [16, 81, 4], [20, 79, 2], [22, 77, 2], [24, 74, 6], [30, 72, 2]];
+const TP_GU = [1, 0, 0.5, 0, 1, 0, 0.5, 0.5, 1, 0, 0.5, 0, 1, 0.5, 0.7, 0.9];   // the beiguan drum through a bar, its accents
+
 const SONGS = {
+  taipei: {
+    bpm: 128, swing: 0,
+    step(e, s, bar, t, dt) {
+      const B = bar % 16, sec = Math.floor(B / 4), c = bar % 4, ch = TP_CH[c], r = TP_ROOT[c];
+      const fill = (B === 3 || B === 15) && s >= 8;   // the build into a drop: a snare roll and a string of firecrackers
+      // the fanfare: the suona over the beiguan drum and the cymbals, a pad, the kick creeping in
+      if (sec === 0) {
+        if (s === 0) { e.pad(t, ch, dt * 16, 0.024); e.nao(t, 0.12, 0.6); if (B === 0) e.daluo(t, 0.22); }
+        for (const [st, n, len] of TP_FAN[c]) if (st === s) e.suona(t, n, dt * len * 0.96, 0.05, 2);
+        if (TP_GU[s] && !fill) e.tonggu(t, 0.22 * TP_GU[s]);
+        if (B >= 2 && s % 4 === 0 && !fill) e.kick(t, 0.35 + B * 0.12);
+        if (s === 6 || s === 14) e.xiaoluo(t, 0.08);
+      }
+      // the drops: four on the floor, claps, the rolling off-beat bass, the suona singing the tune (the supersaws join last)
+      if ((sec === 1 || sec === 3) && !fill) {
+        if (s % 4 === 0) e.kick(t, 0.85);
+        if (s === 4 || s === 12) e.clap(t, 0.2);
+        e.hat(t, s % 4 === 2 ? 0.08 : 0.03, s % 4 === 2);
+        if (s % 4 === 2) e.bass(t, r + 12, dt * 1.6, 0.2, 'sawtooth', 900);
+        if (s % 4 === 3) e.bass(t, r + 24, dt * 0.8, 0.09, 'sawtooth', 1200);
+        if (s === 0) e.pad(t, ch, dt * 16, 0.016);
+        if (s === 0 && c === 0) e.nao(t, 0.1, 0.5);
+        if (sec === 3 && s % 4 === 2) e.supersaw(t, ch, dt * 1.5, 0.022);
+        const off = (c % 2) * 16;
+        for (const [st, n, len] of c < 2 ? TP_A : TP_B) if (st === s + off) { e.suona(t, n, dt * len * 0.92, sec === 3 ? 0.045 : 0.05, 1.5); if (sec === 3) e.lead(t, n + 12, dt * len * 0.9, 0.022, 'square', 2800); }
+      }
+      // the break: drums, gongs and cymbals to themselves, the kick on the half beat, the suona answering low
+      if (sec === 2) {
+        if (s === 0 || s === 8) e.kick(t, 0.7);
+        if (TP_GU[s]) e.tonggu(t, 0.3 * TP_GU[s]);
+        if (s === 0) { e.nao(t, 0.12, 0.5); e.pad(t, ch, dt * 16, 0.022); e.bass(t, r, dt * 14, 0.16, 'triangle', 500); }
+        if (s === 4 || s === 12) e.xiaoluo(t, 0.1);
+        if (s === 8 && c % 2) e.daluo(t, 0.18);
+        const off = (c % 2) * 16;
+        if (c >= 2) for (const [st, n, len] of TP_A) if (st === s + off) e.suona(t, n - 12, dt * len * 0.95, 0.045, 2);
+      }
+      if (fill) {
+        e.snare(t, 0.08 + (s - 8) * 0.025);
+        if (s === 8) e.firecrackers(t, dt * 8, 0.12);
+        if (s === 14) e.nao(t, 0.12, 0.4);
+      }
+    },
+  },
   hk: {
     bpm: 104, swing: 0.06,
     step(e, s, bar, t, dt) {
