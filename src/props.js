@@ -400,6 +400,30 @@ export function barrierStyle({
 
 // ---------- coins ----------
 export function coinGeometry(kind) {
+  if (kind === "bauhinia") {
+    // a Hong Kong two-dollar coin: the scalloped edge, the bauhinia punched through it, five petals swirling round
+    const s = new THREE.Shape();
+    for (let i = 0; i <= 120; i++) {
+      const a = (i / 120) * Math.PI * 2, r = 0.425 + 0.02 * Math.cos(a * 10);
+      i ? s.lineTo(Math.cos(a) * r, Math.sin(a) * r) : s.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    for (let k = 0; k < 5; k++) {
+      // a petal's two edges are spirals from a point near the centre to its tip, curling anticlockwise
+      const a0 = Math.PI / 2 + (k / 5) * Math.PI * 2, h = new THREE.Path(), pts = [];
+      const edge = (t, e) => {
+        const r = 0.06 + 0.27 * t, a = a0 + 0.55 * t + e * 0.37 * Math.sin(Math.PI * Math.pow(t, 0.7));
+        return [Math.cos(a) * r, Math.sin(a) * r];
+      };
+      for (let i = 0; i <= 12; i++) pts.push(edge(i / 12, 1));
+      for (let i = 11; i > 0; i--) pts.push(edge(i / 12, -1));
+      pts.forEach(([x, y], i) => (i ? h.lineTo(x, y) : h.moveTo(x, y)));
+      h.closePath();
+      s.holes.push(h);
+    }
+    const g = new THREE.ExtrudeGeometry(s, { depth: 0.07, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.012, bevelSegments: 2, curveSegments: 12 });
+    g.translate(0, 0, -0.035);
+    return g;
+  }
   if (kind === "qixing") {
     // the seven stars of the Naxi cape: a ring of seven round holes around a little sun
     const s = new THREE.Shape();

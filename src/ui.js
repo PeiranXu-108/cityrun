@@ -142,10 +142,10 @@ export const ui = {
     }
     nav.replaceChildren(t);
   },
-  cityHead(t, tour) {
+  cityHead(t, tour, cityCount) {
     $("cityEn").textContent = tour ? "WORLD TOUR" : t.en;
     $("cityCn").textContent = tour
-      ? "环游模式 · 九城随机连跑"
+      ? `环游模式 · ${cityCount} 城随机连跑`
       : `${t.name} · ${t.tagline}`;
   },
   stats(best, mult, coins) {

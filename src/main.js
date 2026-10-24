@@ -38,6 +38,7 @@ import {
 import { World, THEMES, THEME_ORDER } from "./world.js";
 import { GLYPHS } from "./themes/tokyo.js";
 import { GLYPHS as BJ_GLYPHS } from "./themes/beijing.js";
+import { GLYPHS as HK_GLYPHS } from "./themes/hongkong_kit.js";
 import { POWERUPS } from "./props.js";
 import { Run } from "./game.js";
 import { audio } from "./audio.js";
@@ -254,13 +255,13 @@ function refreshMenu() {
     id: "tour",
     name: "环游",
     en: "WORLD TOUR",
-    tag: "随机顺序 · 九城轮番登场",
+    tag: `随机顺序 · ${n} 城轮番登场`,
     color: "#b26bff",
     best: save.data.bestBy.tour || 0,
     grad: `linear-gradient(120deg, ${THEME_ORDER.map((id, i) => `${THEMES[id].sky.mid} ${Math.round((i / (n - 1)) * 100)}%`).join(", ")})`,
   });
   ui.cities(cards, tour ? "tour" : city, pickCity);
-  ui.cityHead(THEMES[baseTheme()], tour);
+  ui.cityHead(THEMES[baseTheme()], tour, THEME_ORDER.length);
   ui.stats(
     tour ? save.data.bestBy.tour || 0 : save.data.bestBy[city] || 0,
     missions.baseMult,
@@ -848,6 +849,15 @@ async function boot() {
     fonts.push(document.fonts.load('40px "Dela Gothic One"', GLYPHS));
     for (const f of ["Ma Shan Zheng", "ZCOOL QingKe HuangYou"])
       fonts.push(document.fonts.load(`40px "${f}"`, BJ_GLYPHS));
+    // Hong Kong's signs: traditional characters in Hong Kong's own Chiron faces (Ming for the boards, Hei for the rest)
+    // and a kaishu, fetched as a subset holding just the glyphs the signs draw
+    const hkText = [...new Set(HK_GLYPHS + "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 &'·%.É▲▼")].join("");
+    const hkCss = document.createElement("link");
+    hkCss.rel = "stylesheet";
+    hkCss.href = `https://fonts.googleapis.com/css2?family=Chiron+Sung+HK:wght@700;900&family=Chiron+Hei+HK:wght@700;900&family=LXGW+WenKai+TC:wght@700&text=${encodeURIComponent(hkText)}&display=swap`;
+    const hkReady = new Promise((r) => { hkCss.onload = hkCss.onerror = r; });
+    document.head.appendChild(hkCss);
+    fonts.push(hkReady.then(() => Promise.all(['900 40px "Chiron Sung HK"', '700 40px "Chiron Hei HK"', '900 40px "Chiron Hei HK"', '700 40px "LXGW WenKai TC"'].map((f) => document.fonts.load(f, hkText)))));
     await Promise.race([
       Promise.all(fonts),
       new Promise((r) => setTimeout(r, 2500)),

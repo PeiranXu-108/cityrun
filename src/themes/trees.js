@@ -1098,3 +1098,129 @@ export function parisTreeKit() {
   };
   return K;
 }
+
+// ---------- Hong Kong: Chinese banyans with their curtains of aerial roots, Hong Kong orchid trees in bloom, royal palms ----------
+const BANYAN = ['#1e4a2a', '#24542e', '#2c5e34', '#1a4026', '#2f5a30'];
+function banyanTemplate() {   // a squat buttressed trunk, limbs spreading level, a dense dark dome, roots hanging in curtains
+  const wood = [], blobs = [], tips = [];
+  limb(wood, V(0, -0.2, 0), V(0, 2.6, 0), 0.75, 0.55, 10); joint(wood, V(0, 2.6, 0), 0.6);
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 + rand(-0.3, 0.3);
+    limb(wood, V(Math.cos(a) * 1.3, -0.1, Math.sin(a) * 1.3), V(Math.cos(a) * 0.4, 1.3, Math.sin(a) * 0.4), 0.3, 0.16, 5);
+  }
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 + rand(-0.3, 0.3), r = rand(3.0, 4.2);
+    const m = V(Math.cos(a) * r * 0.5, rand(3.6, 4.2), Math.sin(a) * r * 0.5), q = V(Math.cos(a) * r, rand(4.2, 5.0), Math.sin(a) * r);
+    limb(wood, V(0, 2.4, 0), m, 0.38, 0.26, 7); joint(wood, m, 0.27); limb(wood, m, q, 0.26, 0.12, 6);
+    tips.push(m, q);
+  }
+  blobPads(blobs, 10, 0, 5.4, 0, 3.4, 2.2, 1.3, BANYAN, 21);
+  blobPads(blobs, 7, 0, 6.4, 0, 1.9, 2.0, 1.2, BANYAN, 77);
+  for (let i = 0; i < 28; i++) {   // a few roots have reached the ground and thickened into pillars
+    const p = pick(tips).clone().lerp(V(0, 4.4, 0), rand(0, 0.6)).add(V(rand(-0.6, 0.6), -0.3, rand(-0.6, 0.6)));
+    const pillar = Math.random() < 0.15, y1 = pillar ? -0.1 : rand(0.6, 2.8);
+    limb(wood, p, V(p.x + rand(-0.15, 0.15), y1, p.z + rand(-0.15, 0.15)), pillar ? 0.09 : 0.03, pillar ? 0.12 : 0.02, 4);
+  }
+  return { wood: mergeGeometries(wood), canopy: mergeGeometries(blobs) };
+}
+const BAUH = ['#c8288a', '#d8389a', '#b81e7a', '#e050a8', '#a81870'];
+function bauhiniaTex() {   // the Hong Kong orchid tree: big magenta flowers of five petals among its two-lobed leaves
+  return canvasTex(128, 128, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    const leaf = (x, y, s, a) => {   // the bauhinia's leaf, cleft at the tip like a camel's hoof
+      g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = pick(['#3a7a3a', '#2f6a32', '#4a8a40']);
+      g.beginPath(); g.moveTo(0, 9 * s); g.bezierCurveTo(-15 * s, 4 * s, -12 * s, -13 * s, -2.5 * s, -9 * s); g.lineTo(0, -4 * s); g.lineTo(2.5 * s, -9 * s); g.bezierCurveTo(12 * s, -13 * s, 15 * s, 4 * s, 0, 9 * s); g.fill();
+      g.restore();
+    };
+    for (let i = 0; i < 9; i++) leaf(rand(14, 114), rand(14, 114), rand(0.9, 1.3), rand(0, 6.28));
+    const flower = (x, y, r) => {
+      for (let k = 0; k < 5; k++) {
+        const a = (k / 5) * Math.PI * 2 + rand(-0.2, 0.2) - Math.PI / 2, col = new THREE.Color(pick(BAUH));
+        if (k === 0) col.multiplyScalar(0.7);   // the standard petal, darker and veined
+        g.fillStyle = '#' + col.getHexString();
+        g.beginPath(); g.ellipse(x + Math.cos(a) * r * 0.62, y + Math.sin(a) * r * 0.62, r * 0.6, r * 0.3, a, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = 'rgba(255,220,240,0.45)'; g.lineWidth = 0.8; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * r * 1.1, y + Math.sin(a) * r * 1.1); g.stroke();
+      }
+      g.strokeStyle = '#f8d8ea'; g.lineWidth = 1;
+      for (let k = 0; k < 5; k++) { const a = rand(-0.6, 0.6) + Math.PI / 2; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * r * 1.2, y + Math.sin(a) * r * 1.2); g.stroke(); }
+    };
+    for (const [x, y] of [[32, 34], [86, 28], [58, 64], [26, 90], [94, 84], [64, 108], [104, 52]]) flower(x + rand(-5, 5), y + rand(-5, 5), rand(10, 13));
+  }, { repeat: false });
+}
+function bauhiniaCarpetTex() {
+  return canvasTex(256, 256, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    for (let i = 0; i < 520; i++) {
+      const a = Math.random() * Math.PI * 2, r = Math.pow(Math.random(), 0.7) * 120;
+      g.fillStyle = pick(BAUH); g.beginPath(); g.ellipse(w / 2 + Math.cos(a) * r, h / 2 + Math.sin(a) * r, rand(2.5, 4.5), rand(1.2, 2), rand(0, 3), 0, Math.PI * 2); g.fill();
+    }
+  }, { repeat: false });
+}
+function bauhiniaTemplate() {   // a short trunk, arching limbs, a rounded crown of flowering sprays
+  const wood = [], L = new Leaves();
+  const r = rand(0.15, 0.2), top = V(rand(-0.2, 0.2), rand(1.7, 2.1), rand(-0.2, 0.2)), tint = () => new THREE.Color('#ffffff').multiplyScalar(rand(0.88, 1.05));
+  limb(wood, V(0, -0.2, 0), top, r * 1.2, r * 0.85); joint(wood, top, r * 0.86);
+  const nB = randi(4, 5);
+  for (let i = 0; i < nB; i++) {
+    const az = (i / nB) * Math.PI * 2 + rand(-0.35, 0.35), d = V(Math.cos(az), 1.1, Math.sin(az)).normalize();
+    let p = top.clone(), br = r * 0.62;
+    for (let k = 0; k < 3; k++) {
+      d.y -= 0.18; d.normalize();
+      const q = p.clone().addScaledVector(d, rand(0.8, 1.15) * (1 - k * 0.12));
+      limb(wood, p, q, br, br * 0.66, 6);
+      for (let j = 0; j < (k ? 5 : 2); j++) card(L, p.clone().lerp(q, Math.random()).add(V(rand(-0.5, 0.5), rand(0, 0.5), rand(-0.5, 0.5))), rand(0.9, 1.25), tint());
+      p = q; br *= 0.66;
+    }
+    for (let j = 0; j < 4; j++) card(L, p.clone().add(V(rand(-0.6, 0.6), rand(-0.3, 0.4), rand(-0.6, 0.6))), rand(1.0, 1.3), tint());
+  }
+  for (let k = 0; k < 22; k++) {
+    const a = rand(0, Math.PI * 2), rr = Math.sqrt(Math.random()) * 2.4;
+    card(L, V(top.x + Math.cos(a) * rr, top.y + 1.7 + rand(-0.5, 0.6) - rr * 0.3, top.z + Math.sin(a) * rr), rand(1.0, 1.4), tint());
+  }
+  return { wood: mergeGeometries(wood), leaves: L.geometry() };
+}
+function royalPalmTemplate() {   // a royal palm: the smooth grey column swelling a little, the green crownshaft, arching fronds
+  const wood = [], L = new Leaves();
+  const H = rand(9, 12), top = V(rand(-0.25, 0.25), H, rand(-0.25, 0.25));
+  limb(wood, V(0, -0.2, 0), V(0, H * 0.45, 0), 0.34, 0.4, 10); limb(wood, V(0, H * 0.45, 0), top, 0.4, 0.26, 10);
+  const shaft = new THREE.CylinderGeometry(0.24, 0.3, 1.6, 10); shaft.translate(top.x, top.y + 0.8, top.z);
+  const col = new Float32Array(shaft.attributes.position.count * 3); for (let i = 0; i < col.length; i += 3) col.set([0.32, 0.52, 0.26], i);
+  shaft.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const crown = V(top.x, top.y + 1.6, top.z), n = randi(12, 15);
+  for (let i = 0; i < n; i++) {
+    const az = (i / n) * Math.PI * 2 + rand(-0.15, 0.15), len = rand(3.2, 4.0), rise = rand(0.3, 0.9);
+    const out = V(Math.cos(az), 0, Math.sin(az)), side = V(-Math.sin(az), 0, Math.cos(az)), tint = new THREE.Color('#ffffff').multiplyScalar(rand(0.85, 1.05));
+    let prev = null;
+    for (let k = 0; k <= 6; k++) {
+      const t = k / 6, w = 0.5 * Math.sin(Math.PI * Math.min(1, t * 1.15 + 0.08));
+      const c = crown.clone().addScaledVector(out, len * t).add(V(0, len * (rise * t - 1.0 * t * t), 0));
+      const a0 = c.clone().addScaledVector(side, -w), a1 = c.clone().addScaledVector(side, w);
+      if (prev) L.quad(prev[0], prev[1], a0, a1, V(0, 1, 0), prev[2], t, tint, prev[2] * 0.9, t * 0.9);
+      prev = [a0, a1, t];
+    }
+  }
+  return { wood: mergeGeometries(wood), shaft: shaft.toNonIndexed(), leaves: L.geometry() };
+}
+export function hongkongTreeKit() {
+  const bark = std({ map: barkTex(), vertexColors: true, roughness: 0.95 });
+  const bloom = foliageMat(bauhiniaTex(), { sway: 0.06, alphaTest: 0.5, emissive: 0.22 });
+  const frond = foliageMat(frondTex(), { sway: 0.2, alphaTest: 0.45 });
+  const ct = bauhiniaCarpetTex();
+  const carpet = std({ map: ct, alphaTest: 0.4, roughness: 0.9, emissive: '#ffffff', emissiveMap: ct, emissiveIntensity: 0.2 });
+  const T = { banyan: Array.from({ length: 3 }, banyanTemplate), bauh: Array.from({ length: 4 }, bauhiniaTemplate), palm: Array.from({ length: 3 }, royalPalmTemplate) };
+  const place = (x, y, z, ry, s) => new THREE.Matrix4().compose(V(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, ry), V(s, s, s));
+  const petals = (b, x, z, size, y = 0) => b.add(G.plane, carpet, x, y + 0.035, z, size, size, 1, -Math.PI / 2, rand(0, Math.PI), 0);
+  return {
+    banyan(b, x, z, s = 1, { ry = rand(0, Math.PI * 2), y = 0 } = {}) { const t = pick(T.banyan), m = place(x, y, z, ry, s); b.addM(t.wood, bark, m, '#8a8274'); b.addM(t.canopy, VC.solid, m, null); },
+    bauhinia(b, x, z, s = 1, { ry = rand(0, Math.PI * 2), y = 0, carpet: c = true } = {}) {
+      const t = pick(T.bauh), m = place(x, y, z, ry, s * 1.35);
+      b.addM(t.wood, bark, m, '#6a5a4e'); b.addM(t.leaves, bloom, m, null);
+      if (c) petals(b, x, z, 5.5 * s, y);
+    },
+    palm(b, x, z, s = 1, { ry = rand(0, Math.PI * 2), y = 0 } = {}) {
+      const t = pick(T.palm), m = place(x, y, z, ry, s);
+      b.addM(t.wood, bark, m, '#b8b4ac'); b.addM(t.shaft, VC.solid, m, null); b.addM(t.leaves, frond, m, null);
+    },
+    petals,
+  };
+}

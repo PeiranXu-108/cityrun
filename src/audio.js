@@ -501,6 +501,37 @@ class Engine {
     this.noiseSrc(t, dur, this.filt('bandpass', mtof(m) * 3, 9, gn));
   }
 
+  // ---------- Hong Kong: the yangqin's struck strings, the erhu's sung line ----------
+  yangqin(t, m, dur = 0.8, v = 0.07) {         // 揚琴: hammered dulcimer, two strings to a note a hair apart, a bright metal strike
+    const g = this.gain(this.music); this.env(g, t, 0.001, v, dur); g.connect(this.send);
+    const f = this.filt('lowpass', 6500, 1, g);
+    f.frequency.setValueAtTime(8000, t); f.frequency.exponentialRampToValueAtTime(1600, t + dur * 0.6);
+    for (const d of [1, 1.004]) this.osc('triangle', mtof(m) * d, t, dur, f);
+    this.osc('sine', mtof(m) * 3, t, dur * 0.2, this.gain(f, 0.18));
+    const gk = this.gain(this.music); this.env(gk, t, 0.001, v * 0.5, 0.025);
+    this.noiseSrc(t, 0.03, this.filt('bandpass', 3800, 2, gk));
+  }
+  erhu(t, m, dur, v = 0.05, slide = 0) {       // 二胡: the two-string fiddle, softer and more vocal than the jinghu, sliding into its notes
+    const g = this.gain(this.music);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.06);
+    g.gain.setValueAtTime(v * 0.85, t + dur * 0.75); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    g.connect(this.send);
+    const bp = this.filt('bandpass', 1050, 1.0, g), lp = this.filt('lowpass', 2600, 0.7, this.gain(g, 0.5));
+    const o = this.ctx.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(mtof(m - slide), t);
+    if (slide) o.frequency.exponentialRampToValueAtTime(mtof(m), t + 0.1);
+    o.connect(bp); o.connect(lp); o.start(t); o.stop(t + dur + 0.05);
+    const lfo = this.ctx.createOscillator(); lfo.frequency.value = 5.6;
+    const lg = this.ctx.createGain(); lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(0, t + Math.min(0.15, dur * 0.3)); lg.gain.linearRampToValueAtTime(mtof(m) * 0.013, t + Math.min(0.45, dur * 0.8));
+    lfo.connect(lg); lg.connect(o.frequency); lfo.start(t); lfo.stop(t + dur);
+  }
+  tramBellAt(t, v = 0.14, out = this.sfx) {    // one strike of a tram's foot gong: a bright bell with its inharmonic partials
+    for (const [k, a, d] of [[1, 1, 0.9], [2.32, 0.5, 0.6], [4.1, 0.3, 0.35], [5.9, 0.15, 0.2]]) {
+      const g = this.gain(out); this.env(g, t, 0.001, v * a, d);
+      this.osc('sine', 1180 * k, t, d, g);
+    }
+  }
+
   // ---------- sound effects (sfx bus) ----------
   fx(fn) { if (this.ctx && this.sfxOn && this.ctx.state === 'running') try { fn(this.t); } catch (e) { /* ignore */ } }
   tone(t, type, f0, f1, dur, v, out = this.sfx) {
@@ -601,6 +632,16 @@ class Engine {
         const o = this.osc('sawtooth', f * 1.25, t + dd, dur, this.filt('bandpass', f * 1.6, 2.5, g));
         o.frequency.exponentialRampToValueAtTime(f * 0.8, t + dd + dur);
       }
+    });
+  }
+  // a ding-ding coming down the line: the driver stamps on the bell twice
+  tramBell() { this.fx((t) => { this.tramBellAt(t); this.tramBellAt(t + 0.26); }); }
+  // Hong Kong: the tram's "ding ding", a yangqin rippling up the scale, the bell again
+  dingding() {
+    this.fx((t) => {
+      this.tramBellAt(t); this.tramBellAt(t + 0.26);
+      [69, 72, 74, 76, 79, 81, 84, 86].forEach((m, i) => this.tone(t + 0.62 + i * 0.07, 'triangle', mtof(m), mtof(m), 0.5, 0.075));
+      this.tramBellAt(t + 1.36, 0.12); this.tramBellAt(t + 1.62, 0.12);
     });
   }
   // Big Ben: the first two changes of the Westminster Quarters, then the hour bell
@@ -756,7 +797,54 @@ const PA_A = [[0, 4, 2], [2, 7, 2], [4, 9, 4], [8, 8, 2], [10, 7, 2], [12, 6, 2]
 const PA_B = [[0, 9, 3], [3, 7, 1], [4, 5, 2], [6, 7, 2], [8, 9, 4], [12, 10, 4], [16, 8, 2], [18, 6, 2], [20, 5, 2], [22, 4, 4], [26, 6, 2], [28, 8, 4]];
 const PA_BASS = { 0: [0, 2], 3: [12, 1], 6: [0, 1], 8: [0, 2], 10: [7, 1], 11: [12, 1], 14: [0, 2] };
 
+// Hong Kong: an eighties Cantopop night drive. A yangqin rippling over the electric piano opens each cycle, then a city-pop
+// groove (gated snare, sixteenth hats, a slapped octave bass, Rhodes on the off-beats) under Fmaj7 - E7 - Am7 - Gm7 C7;
+// the erhu sings the tune, synth brass answers in the chorus, the yangqin takes it up an octave in the last section, and
+// a run on the wood block and a little gong turn the cycle.
+const HK_ROOT = [41, 40, 45, 43];
+const HK_CH = [[53, 57, 60, 64], [52, 56, 59, 62], [55, 57, 60, 64], [53, 55, 58, 62]];
+const HK_C7 = [52, 55, 58, 60];
+const HK_ARP = [0, 1, 2, 3, 2, 1, 2, 3];
+const HK_BASS = { 0: [0, 2], 3: [12, 1], 4: [0, 1], 6: [7, 1], 8: [0, 2], 10: [12, 1], 11: [10, 1], 14: [7, 2] };
+const HK_A = [[0, 69, 3], [3, 72, 1], [4, 76, 4], [8, 74, 2], [10, 72, 2], [12, 69, 4], [16, 71, 3], [19, 68, 1], [20, 71, 2], [22, 74, 2], [24, 76, 6], [30, 74, 2]];
+const HK_B = [[0, 76, 3], [3, 79, 1], [4, 81, 4], [8, 79, 2], [10, 76, 2], [12, 74, 4], [16, 74, 2], [18, 72, 2], [20, 70, 2], [22, 72, 2], [24, 67, 4], [28, 64, 4]];
+
 const SONGS = {
+  hk: {
+    bpm: 104, swing: 0.06,
+    step(e, s, bar, t, dt) {
+      const B = bar % 16, sec = Math.floor(B / 4), c = bar % 4, half = c === 3 && s >= 8;
+      const ch = half ? HK_C7 : HK_CH[c], r = half ? 36 : HK_ROOT[c], brk = B === 15 && s >= 8;
+      // the intro: the yangqin rippling over the electric piano and a pad
+      if (sec === 0) {
+        if (s % 2 === 0) e.yangqin(t, ch[HK_ARP[(s / 2) % 8]] + 12, dt * 3, 0.06);
+        if (s === 0) { e.pad(t, HK_CH[c], dt * 16, 0.022); e.rhodes(t, HK_CH[c], dt * 12, 0.04); }
+        if (s === 4 || s === 12) e.clap(t, 0.07);
+      }
+      // the city-pop groove: gated snare, sixteenth hats, a slapped octave bass, Rhodes on the off-beats
+      if (sec >= 1 && !brk) {
+        if (s === 0 || s === 6 || s === 10) e.kick(t, 0.85);
+        if (s === 4 || s === 12) { e.snare(t, 0.32); e.clap(t, 0.16); }
+        e.hat(t, s % 4 === 2 ? 0.07 : 0.035, s === 14);
+        const bn = HK_BASS[s];
+        if (bn) e.bass(t, r + bn[0], dt * bn[1] * 0.9, 0.24, 'sawtooth', 760);
+        if (s === 2 || s === 7 || s === 10 || s === 15) e.rhodes(t, ch.map((m) => m + 12), dt * 1.6, 0.032);
+      }
+      if (sec >= 2 && s === 0) e.pad(t, HK_CH[c], dt * 16, 0.02);
+      if (sec === 2 && !brk && (s === 3 || s === 11 || (s === 14 && c % 2))) e.stab(t, ch.map((m) => m + 12), 0.05, dt * 1.2, 'sawtooth');
+      // the tune: the erhu in the groove, the lead synth over it in the chorus, the yangqin an octave up at the end
+      if (sec >= 1 && !brk) {
+        const off = (c % 2) * 16;
+        for (const [st, n, len] of c < 2 ? HK_A : HK_B) if (st === s + off) {
+          if (sec === 1) e.erhu(t, n, dt * len * 0.95, 0.055, 2);
+          else if (sec === 2) { e.lead(t, n, dt * len * 0.9, 0.04, 'square', 2200); e.erhu(t, n - 12, dt * len * 0.95, 0.03); }
+          else { e.yangqin(t, n + 12, dt * len, 0.07); e.erhu(t, n, dt * len * 0.95, 0.045, 2); }
+        }
+      }
+      // the turn of the cycle: a run on the wood block, the little gong
+      if (brk) { if (s % 2 === 0) e.wood(t, 0.14 + (s - 8) * 0.01, 1100 + (s - 8) * 60); if (s === 14) e.xiaoluo(t, 0.12); }
+    },
+  },
   paris: {
     bpm: 124, swing: 0.1,
     step(e, s, bar, t, dt) {

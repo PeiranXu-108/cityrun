@@ -475,7 +475,7 @@ export class Run {
       this.lastBell = this.t;
     }
     if (e.type === "horn") {
-      if (e.o.d0 - this.d < 160) audio.horn();
+      if (e.o.d0 - this.d < 160) audio[e.sound || "horn"]();
     }
     if (e.type === "nearmiss" && !this.flying) {
       this.stats.near++;

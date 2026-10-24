@@ -25,6 +25,8 @@ export const CHARACTERS = [
     skin: '#e8b890', top: '#2a54b0', pants: '#1a1e3a', shoes: '#3a2a20', sole: '#ffd166', hat: '#1a2a6a', hair: '#1a1210', accent: '#ffd166', pack: '#f2ece0', trail: '#1fc8e0' },
   { id: 'parisienne', name: '巴黎女孩', en: 'PARISIENNE', price: 5000, desc: '戴红色贝雷帽、穿海魂衫的巴黎女孩，系着红色小方巾，手里攥着一根刚出炉的法棍', style: 'paris',
     skin: '#f0cca8', top: '#f4f2ec', pants: '#1a2440', shoes: '#141414', sole: '#ff6aa8', hat: '#c8202c', hair: '#5a3220', accent: '#ff6aa8', pack: '#1a2a5a', trail: '#ff6aa8' },
+  { id: 'lion', name: '醒狮', en: 'LION DANCER', price: 5500, desc: '舞南狮的香港少年，顶着红金狮头：额上一面镜子、一双大眼、白绒绒的狮毛和独角，身后披着狮被，跑起来狮口一张一合', style: 'lion',
+    skin: '#e8c4a0', top: '#d8202a', pants: '#f2c230', shoes: '#1a1a1e', sole: '#ffd166', hat: '#d8202a', hair: '#f6f4ee', accent: '#ffd166', pack: '#d8202a', trail: '#ff3d7f' },
 ];
 // triangular pennant for the opera general's back flags (靠旗)
 const FLAG = new THREE.BufferGeometry();
@@ -58,7 +60,7 @@ function part(geo, mat, x, y, z, sx, sy, sz, parent) {
 const grp = (parent, x = 0, y = 0, z = 0) => { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; };
 
 export function buildCharacter(d) {
-  const robot = d.style === 'robot', panda = d.style === 'panda', guard = d.style === 'guard', neko = d.style === 'neko', rabbit = d.style === 'rabbit', liberty = d.style === 'liberty', koala = d.style === 'koala', guardsman = d.style === 'guardsman', naxi = d.style === 'naxi', paris = d.style === 'paris';
+  const robot = d.style === 'robot', panda = d.style === 'panda', guard = d.style === 'guard', neko = d.style === 'neko', rabbit = d.style === 'rabbit', liberty = d.style === 'liberty', koala = d.style === 'koala', guardsman = d.style === 'guardsman', naxi = d.style === 'naxi', paris = d.style === 'paris', lion = d.style === 'lion';
   const root = new THREE.Group();
   const body = grp(root, 0, 0.6, 0);         // roll / lean pivot
   const inner = grp(body, 0, -0.6, 0);
@@ -81,8 +83,9 @@ export function buildCharacter(d) {
   const L = leg(-1), R = leg(1);
 
   const torso = grp(hips, 0, 0, 0);
+  let tail = null;
   part(RB, mTop, 0, 0.32, guard ? 0.03 : 0, 0.52 * wide, 0.62, guard ? 0.4 : 0.3, torso);
-  if (!panda && !guard && !neko && !rabbit && !liberty && !koala && !guardsman && !naxi && !paris) part(BOX, E(d.accent, 2.6), 0, 0.38, -0.152, 0.53, 0.05, 0.012, torso);
+  if (!panda && !guard && !neko && !rabbit && !liberty && !koala && !guardsman && !naxi && !paris && !lion) part(BOX, E(d.accent, 2.6), 0, 0.38, -0.152, 0.53, 0.05, 0.012, torso);
   if (robot) {
     part(SPH, E(d.accent, 3), 0, 0.42, -0.16, 0.14, 0.14, 0.05, torso);
   }
@@ -118,6 +121,13 @@ export function buildCharacter(d) {
     for (let k = 0; k < 6; k++) part(BOX, M(d.pack, 0.6), 0, 0.08 + k * 0.1, 0, 0.535, 0.045, 0.315, torso);   // the marinière's navy stripes
     part(BOX, M(d.hat, 0.6), 0, 0.6, -0.01, 0.36, 0.08, 0.33, torso);                   // a red neckerchief
     part(BOX, M(d.hat, 0.6), 0.12, 0.52, -0.165, 0.08, 0.14, 0.03, torso).rotation.z = 0.35;
+  } else if (lion) {
+    const gold = M(d.accent, 0.35, 0.6), fur = M(d.hair, 0.95);
+    part(BOX, gold, 0, 0.06, 0, 0.56, 0.1, 0.34, torso);                               // the gold sash
+    part(BOX, gold, 0.16, -0.05, -0.17, 0.08, 0.22, 0.02, torso);
+    part(BOX, M(d.pack, 0.7), 0, 0.28, 0.2, 0.62, 0.74, 0.04, torso);                  // the lion's body cloth down his back
+    for (let k = 0; k < 9; k++) part(SPH, gold, -0.2 + (k % 3) * 0.2, 0.5 - Math.floor(k / 3) * 0.2, 0.225, 0.11, 0.09, 0.02, torso);   // its gold scales
+    for (let k = 0; k < 6; k++) part(SPH, fur, -0.27 + k * 0.108, -0.1, 0.22, 0.12, 0.12, 0.08, torso);   // and the white fringe on its hem
   } else if (koala) {
     part(RB, M(d.pack, 0.8), 0, 0.32, -0.12, 0.36, 0.44, 0.1, torso);                 // pale chest fur
   } else if (liberty) {
@@ -142,7 +152,28 @@ export function buildCharacter(d) {
   }
 
   const head = grp(torso, 0, 0.7, 0);
-  if (robot) {
+  if (lion) {   // the southern lion's head worn over his own: red and gold, the mirror on the brow, big eyes, white fur, one horn
+    const red = M(d.hat, 0.55), gold = M(d.accent, 0.35, 0.6), fur = M(d.hair, 0.95), dark = M('#141414', 0.4);
+    part(RB, red, 0, 0.26, 0.02, 0.56, 0.44, 0.56, head);
+    part(BOX, gold, 0, 0.45, -0.24, 0.5, 0.1, 0.1, head);
+    const mirror = part(CYL, E('#dff0ff', 1.8), 0, 0.36, -0.275, 0.12, 0.02, 0.12, head); mirror.rotation.x = Math.PI / 2;   // the mirror that scares off evil
+    part(CYL, gold, 0, 0.36, -0.27, 0.16, 0.02, 0.16, head).rotation.x = Math.PI / 2;
+    part(SPH, M('#2fa84f', 0.4), 0, 0.58, -0.18, 0.09, 0.24, 0.09, head).rotation.x = -0.55;   // the horn
+    for (const sx of [-1, 1]) {
+      part(SPH, M('#ffffff', 0.3), sx * 0.13, 0.28, -0.25, 0.15, 0.15, 0.1, head);        // the big eyes, gold lids over them
+      part(SPH, dark, sx * 0.13, 0.28, -0.3, 0.07, 0.08, 0.03, head);
+      part(SPH, gold, sx * 0.13, 0.35, -0.25, 0.17, 0.07, 0.11, head);
+      part(SPH, red, sx * 0.25, 0.48, 0.06, 0.1, 0.14, 0.08, head);                        // the ears
+    }
+    part(SPH, M('#ff6a8a', 0.5), 0, 0.17, -0.3, 0.12, 0.09, 0.08, head);                   // the nose
+    for (let k = 0; k < 7; k++) part(SPH, fur, -0.27 + k * 0.09, 0.5, -0.27, 0.12, 0.1, 0.09, head);   // white fur along the brow
+    for (const sx of [-1, 1]) for (let k = 0; k < 4; k++) part(SPH, fur, sx * 0.3, 0.42 - k * 0.1, -0.2 + k * 0.06, 0.1, 0.11, 0.1, head);
+    tail = grp(head, 0, 0.08, 0.12);   // the lower jaw, which snaps open and shut as he runs (the Animator swings tail.x in 0.1..0.6)
+    const jaw = grp(tail); jaw.rotation.x = -0.7;
+    part(RB, red, 0, -0.04, -0.2, 0.46, 0.1, 0.42, jaw);
+    for (let k = 0; k < 5; k++) part(SPH, fur, -0.18 + k * 0.09, -0.11, -0.36, 0.11, 0.12, 0.09, jaw);   // the beard
+    part(BOX, M('#f4f4ee', 0.4), 0, 0.02, -0.38, 0.32, 0.03, 0.03, jaw);
+  } else if (robot) {
     part(RB, M(d.top, 0.25, 0.8), 0, 0.18, 0, 0.36, 0.34, 0.33, head);
     part(BOX, E(d.accent, 3.2), 0, 0.2, -0.166, 0.3, 0.09, 0.01, head);
     part(CYL, M('#58627a', 0.4, 0.8), 0.12, 0.42, 0, 0.025, 0.18, 0.025, head);
@@ -163,7 +194,6 @@ export function buildCharacter(d) {
       part(BOX, eye, 0.07, 0.2, -0.151, 0.04, 0.06, 0.01, head);
     }
   }
-  let tail = null;
   if (d.style === 'cap') {
     part(RB, M(d.hair, 0.8), 0, 0.27, 0.02, 0.34, 0.16, 0.32, head);
     part(RB, M(d.hat, 0.5), 0, 0.36, 0.01, 0.35, 0.13, 0.33, head);
