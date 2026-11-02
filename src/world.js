@@ -34,9 +34,13 @@ import lj from "./themes/lijiang.js";
 import paris from "./themes/paris.js";
 import hk from "./themes/hongkong.js";
 import taipei from "./themes/taipei.js";
+import ist from "./themes/istanbul.js";
+import msk from "./themes/moscow.js";
+import sf from "./themes/sf.js";
+import la from "./themes/la.js";
 
-export const THEMES = { ny, pgh, hz, bj, tokyo, syd, ldn, lj, paris, hk, taipei };
-export const THEME_ORDER = ["ny", "pgh", "hz", "bj", "tokyo", "syd", "ldn", "lj", "paris", "hk", "taipei"];
+export const THEMES = { ny, pgh, hz, bj, tokyo, syd, ldn, lj, paris, hk, taipei, ist, msk, sf, la };
+export const THEME_ORDER = ["ny", "pgh", "hz", "bj", "tokyo", "syd", "ldn", "lj", "paris", "hk", "taipei", "ist", "msk", "sf", "la"];
 export const TOUR_LEN = CHUNK_LEN * 15;
 // The World Tour visits every city once in a random order, then shuffles again; never the same city twice in a row.
 function tourOrder(prev) {
@@ -83,12 +87,19 @@ export class World {
   ensureTheme(id) {
     if (this.assets[id]) return this.assets[id];
     const a = THEMES[id].build();
-    a.decorFree = [];
     a.trackFree = [];
-    a.decorCount = 0;
-    for (let i = 0; i < DECOR_VARIANTS; i++) {
-      a.decorFree.push(a.decor());
-      a.decorCount++;
+    // A theme can split its streets into stretches (Hangzhou: West Lake, the plane-tree avenue, the Qiantang): zoneAt(k)
+    // names chunk k's stretch, decor(zone) builds one, and each stretch keeps its own pool, [built up front, most kept].
+    // Without zoneAt there is one unnamed pool.
+    const pools = a.zonePool || { "": [DECOR_VARIANTS, DECOR_VARIANTS + 3] };
+    a.decorFree = {};
+    a.decorCount = {};
+    a.decorCap = {};
+    for (const [zone, [n, cap]] of Object.entries(pools)) {
+      a.decorFree[zone] = [];
+      a.decorCount[zone] = n;
+      a.decorCap[zone] = cap;
+      for (let i = 0; i < n; i++) a.decorFree[zone].push(a.decor(zone));
     }
     for (const lm of a.landmarks || []) {
       lm.obj = lm.build();
@@ -179,23 +190,25 @@ export class World {
         decor = lm.obj;
       }
     }
+    const zone = a.zoneAt ? a.zoneAt(k) : "",
+      free = a.decorFree[zone];
     if (decor) {
       /* landmark scene */
     } else if (
-      a.decorFree.length &&
-      (a.decorCount >= DECOR_VARIANTS + 3 || chance(0.75))
+      free.length &&
+      (a.decorCount[zone] >= a.decorCap[zone] || chance(0.75))
     )
-      decor = a.decorFree.splice(randi(0, a.decorFree.length - 1), 1)[0];
+      decor = free.splice(randi(0, free.length - 1), 1)[0];
     else {
-      decor = a.decor();
-      a.decorCount++;
+      decor = a.decor(zone);
+      a.decorCount[zone]++;
     }
     const track = a.trackFree.pop() || a.track.clone();
     const g = new THREE.Group();
     g.add(track, decor);
     g.position.z = -d0;
     this.root.add(g);
-    this.chunks.push({ d0, theme, g, decor, track, lm, told: false });
+    this.chunks.push({ d0, theme, g, decor, track, lm, zone, told: false });
     if (this.tour && d0 > 0 && d0 % TOUR_LEN === 0) {
       const t = THEMES[theme];
       const obj =
@@ -210,7 +223,7 @@ export class World {
     c.g.remove(c.decor);
     c.g.remove(c.track);
     if (c.lm) c.lm.inUse = false;
-    else a.decorFree.push(c.decor);
+    else a.decorFree[c.zone].push(c.decor);
     a.trackFree.push(c.track);
     this.root.remove(c.g);
   }

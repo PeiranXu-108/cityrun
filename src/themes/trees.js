@@ -683,9 +683,9 @@ function frondTex() {   // pinnate palm frond: a midrib with leaflets
     }
   }, { repeat: false });
 }
-function blobPads(list, n, cx, cy, cz, r, sx, sy, pal, seed) {   // flattened leafy clumps
+function blobPads(list, n, cx, cy, cz, r, sx, sy, pal, seed, detail = 1) {   // flattened leafy clumps
   for (let i = 0; i < n; i++) {
-    const g = new THREE.IcosahedronGeometry(1, 1), pos = g.attributes.position;
+    const g = new THREE.IcosahedronGeometry(1, detail), pos = g.attributes.position;
     for (let k = 0; k < pos.count; k++) {
       const x = pos.getX(k), y = pos.getY(k), z = pos.getZ(k), f = 0.84 + 0.3 * hash(Math.round(x * 100), Math.round(y * 100), Math.round(z * 100) + seed + i * 7);
       pos.setXYZ(k, x * f, y * f, z * f);
@@ -917,6 +917,7 @@ export function londonTreeKit() {
       if (lights) b.addM(t[lights], VC.glow, m, null);
       if (baubles) for (const q of t.pts.baubles) { p.copy(q).applyMatrix4(m); b.sph(VC.metal, pick(BAUBLE), p.x, p.y, p.z, 0.11 * s, true); }
       if (star) { p.set(0, t.top, 0).applyMatrix4(m); b.add(G.cone4, VC.glow, p.x, p.y, p.z, 0.42 * s, 0.42 * s, 0.1 * s, 0, 0, Math.PI / 4, hdr('#ffd86a', 3)); b.add(G.cone4, VC.glow, p.x, p.y, p.z, 0.42 * s, 0.42 * s, 0.1 * s, 0, Math.PI / 2, Math.PI / 4, hdr('#ffd86a', 3)); }
+      return p.set(0, t.top, 0).applyMatrix4(m).y;   // the height of the tip, for whatever goes on top
     },
   };
 }
@@ -1306,5 +1307,199 @@ export function taipeiTreeKit() {
     },
     camphor(b, x, z, s = 1, { ry = rand(0, Math.PI * 2), y = 0 } = {}) { const t = pick(T.camphor), m = place(x, y, z, ry, s * 1.3); b.addM(t.wood, bark, m, '#7a6e5e'); b.addM(t.canopy, VC.solid, m, null); },
     flowers,
+  };
+}
+
+// ---------- Hangzhou: the plane-tree avenues by West Lake (北山街, 南山路) in early summer ----------
+// A London plane in fresh leaf: the foot whitewashed, the pale mottled trunk forking low into a few long limbs. The two
+// on the road side climb steeply and then reach out over the road, so the rows on either side meet in a tunnel high
+// over the track (nothing within reach of the jetpack's camera); the others lean out over the lake or the pavement.
+// Modelled with the road toward +x; the crown is flattened clumps, their undersides warmed by the street lamps.
+const WUTONG = ['#5c9a3e', '#68a848', '#4f8c38', '#76b452', '#46803a', '#82bc5c'];
+const LAMPLIT = new THREE.Color(1.22, 1.08, 0.72);
+function wutongTemplate(pal = WUTONG) {
+  const wood = [], crown = [], paint = [];
+  const r = rand(0.34, 0.42), fork = V(rand(0.2, 0.45), rand(3.0, 3.5), rand(-0.25, 0.25));
+  limb(wood, V(0, -0.3, 0), V(0, 0.7, 0), r * 1.35, r);
+  limb(wood, V(0, 0.6, 0), fork, r, r * 0.86, 8); joint(wood, fork, r * 0.92);
+  paint.push(new THREE.CylinderGeometry(r * 1.06, r * 1.42, 1.3, 9, 1, true).translate(0, 0.55, 0).toNonIndexed());
+  const branch = (pts, r0) => {   // a limb from the fork through the given points, tapering to its tip
+    let a = fork, rr = r0;
+    pts.forEach((p, i) => {
+      const last = i === pts.length - 1, r1 = rr * (last ? 0.45 : 0.74);
+      limb(wood, a, p, rr, r1, 6);
+      if (!last) joint(wood, p, r1);
+      a = p; rr = r1;
+    });
+  };
+  const sway = () => rand(-1.4, 1.4), a1 = sway(), a2 = sway(), a3 = sway();
+  branch([V(1.0, 9.4, a1 * 0.4), V(2.9, 14.2, a1 * 0.8), V(5.6, 17.4, a1), V(7.4, 18.2, a1 * 1.1)], r * 0.68);   // over the road
+  branch([V(0.4, 10.4, a2 * 0.4), V(1.7, 15.4, a2 * 0.8), V(3.9, 18.6, a2)], r * 0.58);
+  branch([V(-1.6, 7.8, a3 * 0.5), V(-3.9, 10.9, a3), V(-5.4, 12.2, a3 * 1.1)], r * 0.6);   // out over the lake or the pavement
+  const a4 = sway(), up = Math.random() < 0.7;
+  if (up) branch([V(-0.4, 10.8, a4 * 0.5), V(-1.2, 16.2, a4)], r * 0.5);
+  const clumps = [
+    [6.6, 18.4, a1, 2.4], [4.6, 17.6, a1 * 0.9, 2.2], [3.2, 18.9, a2, 2.2], [1.6, 17.4, a2 * 0.6, 2.0], [-2.6, 13.8, a3, 2.0],
+    [-4.6, 12.9, a3, 2.0], [-5.8, 13.4, a3 * 1.2, 1.6], [7.8, 18.6, a1 + rand(-1.6, 1.6), 1.8], [5.0, 19.2, a1 + rand(-1.6, 1.6), 1.8],
+    [2.2, 19.4, rand(-2, 2), 1.8], [-0.8, 16.8, up ? a4 : 0, 2.2], [-1.6, 18.2, up ? a4 : rand(-2, 2), 1.7],
+  ];
+  clumps.forEach(([x, y, z, s0], i) => {
+    const g = new THREE.IcosahedronGeometry(1, 1), pos = g.attributes.position;
+    for (let k = 0; k < pos.count; k++) {
+      const px = pos.getX(k), py = pos.getY(k), pz = pos.getZ(k), f = 0.86 + 0.28 * hash(Math.round(px * 100), Math.round(py * 100), Math.round(pz * 100) + i * 7);
+      pos.setXYZ(k, px * f, py * f, pz * f);
+    }
+    const s = s0 * rand(0.85, 1.15), sx = s * rand(1.05, 1.3), sy = s * rand(0.55, 0.72), sz = s * rand(1.05, 1.3);
+    let cy = y + rand(-0.4, 0.4);
+    if (x + sx > 2.8) cy = Math.max(cy, 15.4 + sy * 1.15);   // over the road: the jetpack's camera at ~12.6 m passes under it
+    g.scale(sx, sy, sz); g.translate(x, cy, z); g.computeVertexNormals();
+    const base = new THREE.Color(pick(pal)), col = new Float32Array(pos.count * 3), nor = g.attributes.normal;
+    for (let f = 0; f < pos.count; f += 3) {
+      const c = base.clone().multiplyScalar(rand(0.85, 1.12));
+      if (nor.getY(f) + nor.getY(f + 1) + nor.getY(f + 2) < -0.9) c.multiply(LAMPLIT);
+      for (let k = 0; k < 3; k++) col.set([c.r, c.g, c.b], (f + k) * 3);
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    crown.push(g);
+  });
+  return { wood: mergeGeometries(wood), crown: mergeGeometries(crown), paint: mergeGeometries(paint) };
+}
+export function wutongKit(pal = WUTONG) {
+  const bark = std({ map: planeBarkTex(), vertexColors: true, roughness: 0.9 });
+  const T = Array.from({ length: 5 }, () => wutongTemplate(pal));
+  const place = (x, y, z, ry, s) => new THREE.Matrix4().compose(V(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, ry), V(s, s, s));
+  return {
+    // its big limbs reach toward x = 0 (over the track) from whichever side it stands on
+    wutong(b, x, z, s = rand(0.96, 1.1), { y = 0, toward = x < 0 ? 1 : -1, ry = rand(-0.2, 0.2) } = {}) {
+      const t = pick(T), m = place(x, y, z, (toward > 0 ? 0 : Math.PI) + ry, s);
+      b.addM(t.wood, bark, m, '#f4f4ee');
+      b.addM(t.paint, VC.solid, m, '#e8e6de');
+      b.addM(t.crown, VC.solid, m, null);
+    },
+  };
+}
+
+// ---------- San Francisco: the Monterey cypress of the Presidio and the headlands ----------
+// A massive trunk that forks low into a few great limbs reaching out sideways, the crown a flat-topped heap of dense
+// dark pads, all of it leaning away from the ocean wind (local +x is downwind).
+const MONTEREY = ['#1e3a26', '#26462e', '#2c4e34', '#1a3424', '#30523a'];
+function montereyTemplate(detail = 1) {   // detail 0: a quarter of the leaves' triangles, for trees seen from afar
+  const wood = [], pads = [];
+  const lean = rand(0.5, 1.0), top = V(lean, rand(2.0, 2.6), rand(-0.3, 0.3));
+  limb(wood, V(0, -0.3, 0), V(0, 0.7, 0), 0.75, 0.6, 8);
+  limb(wood, V(0, 0.6, 0), top, 0.6, 0.48, 8); joint(wood, top, 0.5);
+  const n = randi(4, 5);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 + rand(-0.4, 0.4), reach = rand(2.2, 3.6) + Math.max(0, Math.cos(a)) * 1.6;   // the downwind limbs reach furthest
+    const q = top.clone().add(V(Math.cos(a) * reach, rand(1.2, 2.6) - Math.max(0, -Math.cos(a)) * 0.8, Math.sin(a) * reach));
+    limb(wood, top, q, 0.36, 0.16, 6);
+    blobPads(pads, 3, q.x, q.y + 0.35, q.z, 1.0, rand(1.5, 2.1), rand(0.5, 0.75), MONTEREY, i * 17, detail);
+    const m = top.clone().lerp(q, 0.5);
+    blobPads(pads, 2, m.x, m.y + 0.5, m.z, 0.7, rand(1.1, 1.5), rand(0.45, 0.6), MONTEREY, i * 29 + 3, detail);
+  }
+  blobPads(pads, 4, top.x + 0.6, top.y + 2.6, top.z, 1.2, 1.9, 0.6, MONTEREY, 91, detail);   // the flat, wind-shorn top
+  return { wood: mergeGeometries(wood), canopy: mergeGeometries(pads) };
+}
+export function sfTreeKit() {
+  const bark = std({ map: barkTex(), vertexColors: true, roughness: 0.95 });
+  const T = Array.from({ length: 3 }, () => montereyTemplate(1)), TL = Array.from({ length: 3 }, () => montereyTemplate(0));
+  const place = (x, y, z, ry, s) => new THREE.Matrix4().compose(V(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, ry), V(s, s, s));
+  return {
+    // ry: which way the wind has pushed it (0 leans toward +x); lo: the cheap leaves, for trees well away from the track
+    cypress(b, x, z, s = 1, { ry = rand(-0.4, 0.4), y = 0, lo = false } = {}) { const t = pick(lo ? TL : T), m = place(x, y, z, ry, s); b.addM(t.wood, bark, m, '#6a5a4c'); b.addM(t.canopy, VC.solid, m, null); },
+  };
+}
+
+// ---------- Los Angeles: the Mexican fan palms that line its streets, birds of paradise ----------
+// Washingtonia robusta: a very tall, thin trunk with a slight lean and a swollen foot, the boot of old leaf bases under
+// the crown (or, left untrimmed, the long skirt of dead fronds), a small round head of fan leaves: the young ones up,
+// the old drooping. Each leaf is one card standing in the vertical plane of its stalk, so the crown reads as a burst of
+// fans against the evening sky from wherever it is seen.
+function fanLeafTex() {   // one leaf: its stalk, then the round blade of folded segments fanning out from the hub, the tips split
+  return canvasTex(128, 128, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    const hx = 64, hy = 84;   // the hub (the canvas's top is the leaf's far end)
+    g.strokeStyle = '#6a7036'; g.lineWidth = 3.2; g.beginPath(); g.moveTo(hx, h); g.lineTo(hx, hy); g.stroke();
+    const n = 26;
+    for (let i = 0; i < n; i++) {
+      const a = Math.PI + ((i + 0.5) / n) * Math.PI + rand(-0.03, 0.03), r1 = rand(50, 60), wm = 0.055, c = pick(['#4a7a34', '#56863a', '#3e6c2e', '#62903f', '#4e8036']);
+      const P = (r, da) => [hx + Math.cos(a + da) * r, hy + Math.sin(a + da) * r];
+      g.fillStyle = c; g.beginPath(); g.moveTo(...P(5, 0));
+      g.lineTo(...P(r1 * 0.55, -wm)); g.lineTo(...P(r1 * 0.86, -wm * 0.8)); g.lineTo(...P(r1, -wm * 0.9 - 0.02));   // the split tip: two prongs
+      g.lineTo(...P(r1 * 0.88, 0)); g.lineTo(...P(r1, wm * 0.9 + 0.02)); g.lineTo(...P(r1 * 0.86, wm * 0.8)); g.lineTo(...P(r1 * 0.55, wm));
+      g.closePath(); g.fill();
+      g.strokeStyle = 'rgba(30,56,24,0.6)'; g.lineWidth = 1; g.beginPath(); g.moveTo(...P(6, 0)); g.lineTo(...P(r1 * 0.85, 0)); g.stroke();   // the fold
+      if (Math.random() < 0.35) { g.fillStyle = '#9a8a52'; g.beginPath(); g.moveTo(...P(r1 * 0.9, -wm)); g.lineTo(...P(r1, -wm)); g.lineTo(...P(r1, wm)); g.lineTo(...P(r1 * 0.9, wm)); g.fill(); }   // a browned tip
+    }
+    g.fillStyle = '#7a7a3a'; g.beginPath(); g.arc(hx, hy, 4, 0, Math.PI * 2); g.fill();
+  }, { repeat: false });
+}
+const bakeCol = (geo, hex, jitter = 0) => {   // a geometry with its own vertex colour (merged under VC.solid)
+  const p = geo.attributes.position, c = new THREE.Color(hex), a = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++) { const k = 1 + (jitter ? rand(-jitter, jitter) : 0); a.set([c.r * k, c.g * k, c.b * k], i * 3); }
+  geo.setAttribute('color', new THREE.BufferAttribute(a, 3));
+  return geo;
+};
+function fanPalmTemplate(skirt) {
+  const wood = [], parts = [], L = new Leaves();
+  const H = rand(17, 22.5), lx = rand(-0.8, 0.8), lz = rand(-0.8, 0.8), top = V(lx, H, lz), mid = V(lx * 0.3 + rand(-0.25, 0.25), H * 0.5, lz * 0.3 + rand(-0.25, 0.25));
+  limb(wood, V(0, -0.3, 0), V(0, 1.1, 0), 0.62, 0.42, 7);   // the swollen foot
+  limb(wood, V(0, 1.0, 0), mid, 0.42, 0.31, 7);
+  limb(wood, mid, top, 0.31, 0.26, 7);
+  if (skirt) {   // the skirt of dead fronds hanging down the top of the trunk
+    const g = new THREE.CylinderGeometry(0.8, 1.05, 5.6, 8, 1, true); g.translate(top.x, H - 2.5, top.z);
+    parts.push(bakeCol(g.toNonIndexed(), '#9a7e52', 0.12));
+  } else {   // the boot: the stubs of the leaf bases left by the trimmers
+    const g = new THREE.CylinderGeometry(0.46, 0.3, 1.7, 7, 1, true); g.translate(top.x, H - 0.55, top.z);
+    parts.push(bakeCol(g.toNonIndexed(), '#8a6a46', 0.1));
+  }
+  const C = V(top.x, H + 0.35, top.z), n = randi(16, 20);
+  for (let i = 0; i < n; i++) {
+    const az = (i / n) * Math.PI * 2 * 2.618 + rand(-0.2, 0.2);   // golden-angle spread
+    const kind = i % 5, el = kind === 0 ? rand(0.9, 1.3) : kind < 3 ? rand(-0.05, 0.6) : rand(-0.95, -0.35);
+    const S = (kind === 0 ? rand(1.9, 2.3) : rand(2.4, 2.9)) * (skirt && kind > 2 ? 0.9 : 1);
+    const d = V(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az));
+    const u = V(-Math.sin(el) * Math.cos(az), Math.cos(el), -Math.sin(el) * Math.sin(az)).applyAxisAngle(d, rand(-0.4, 0.4));
+    const base = C.clone().addScaledVector(d, 0.15);
+    const a0 = base.clone().addScaledVector(u, -S / 2), a1 = base.clone().addScaledVector(u, S / 2), b0 = a0.clone().addScaledVector(d, S), b1 = a1.clone().addScaledVector(d, S);
+    const nrm = V().crossVectors(d, u).normalize().multiplyScalar(0.45).addScaledVector(UP, 0.55).normalize();
+    const tint = kind > 3 && Math.random() < 0.5 ? new THREE.Color(1.35, 1.0, 0.55).multiplyScalar(rand(0.8, 0.95)) : new THREE.Color('#ffffff').multiplyScalar(rand(0.8, 1.05));
+    L.quad(a0, a1, b0, b1, nrm, 0, 1, tint, 0.1, 1);
+  }
+  return { H: H + 0.35, wood: mergeGeometries(wood), parts: mergeGeometries(parts), leaves: L.geometry() };
+}
+function strelitziaTex() {   // a bird of paradise: grey-green paddle leaves on long stalks, the orange-and-blue flowers like birds' heads
+  return canvasTex(128, 128, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    for (let i = 0; i < 9; i++) {
+      const x = rand(14, 114), top = rand(14, 60), lean = rand(-14, 14), c = pick(['#4a6a4a', '#56785a', '#3e5e42', '#62806a']);
+      g.strokeStyle = c; g.lineWidth = 2.4; g.beginPath(); g.moveTo(x, h); g.quadraticCurveTo(x + lean * 0.3, (h + top) / 2, x + lean, top + 20); g.stroke();
+      g.fillStyle = c; g.beginPath(); g.ellipse(x + lean, top + 8, rand(5, 8), rand(14, 20), lean * 0.02, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = 'rgba(30,50,34,0.7)'; g.lineWidth = 1; g.beginPath(); g.moveTo(x + lean, top - 8); g.lineTo(x + lean, top + 24); g.stroke();
+    }
+    for (let i = 0; i < 4; i++) {
+      const x = rand(24, 104), y = rand(40, 70), s = pick([-1, 1]);
+      g.strokeStyle = '#5a7a5a'; g.lineWidth = 2; g.beginPath(); g.moveTo(x, h); g.lineTo(x, y); g.stroke();
+      g.fillStyle = '#6a7a6a'; g.beginPath(); g.moveTo(x, y); g.lineTo(x + s * 22, y - 3); g.lineTo(x + s * 2, y + 4); g.fill();   // the beak
+      for (let k = 0; k < 3; k++) { g.fillStyle = '#ff8a1a'; g.beginPath(); g.moveTo(x + s * (4 + k * 4), y - 1); g.lineTo(x + s * (2 + k * 5), y - 16 - k * 2); g.lineTo(x + s * (7 + k * 4), y - 2); g.fill(); }   // the orange sepals
+      g.fillStyle = '#3a4ad8'; g.beginPath(); g.moveTo(x + s * 8, y - 2); g.lineTo(x + s * 14, y - 11); g.lineTo(x + s * 12, y - 1); g.fill();   // the blue petals
+    }
+  }, { repeat: false });
+}
+export function laTreeKit() {
+  const bark = std({ map: barkTex(), vertexColors: true, roughness: 0.95 });
+  const fan = foliageMat(fanLeafTex(), { sway: 0.14, alphaTest: 0.45 });
+  const bird = foliageMat(strelitziaTex(), { sway: 0.05, alphaTest: 0.45, emissive: 0.1 });
+  const T = { trim: Array.from({ length: 4 }, () => fanPalmTemplate(false)), skirt: Array.from({ length: 2 }, () => fanPalmTemplate(true)) };
+  const B = Array.from({ length: 3 }, () => clumpTemplate(1.0, 1.25));
+  const place = (x, y, z, ry, sx, sy = sx, sz = sx) => new THREE.Matrix4().compose(V(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, ry), V(sx, sy, sz));
+  return {
+    // a fan palm 17–23 m tall at s = 1, its head of fans about 2.9·s across each way; returns the height of the head
+    fanPalm(b, x, z, s = 1, { ry = rand(0, Math.PI * 2), y = 0, skirt = Math.random() < 0.18 } = {}) {
+      const t = pick(skirt ? T.skirt : T.trim), m = place(x, y, z, ry, s);
+      b.addM(t.wood, bark, m, '#a09080'); b.addM(t.parts, VC.solid, m, null); b.addM(t.leaves, fan, m, null);
+      return y + t.H * s;
+    },
+    strelitzia(b, x, z, s = 1, { y = 0 } = {}) { b.addM(pick(B), bird, place(x, y, z, rand(0, Math.PI), s), null); },
   };
 }

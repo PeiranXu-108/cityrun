@@ -400,6 +400,97 @@ export function barrierStyle({
 
 // ---------- coins ----------
 export function coinGeometry(kind) {
+  if (kind === "star") {
+    // Los Angeles's coin: a star of the Walk of Fame in gold, the round emblem in its middle punched through
+    const s = new THREE.Shape();
+    for (let k = 0; k < 10; k++) {
+      const a = Math.PI / 2 + (k * Math.PI) / 5, r = k % 2 ? 0.21 : 0.5;
+      k ? s.lineTo(Math.cos(a) * r, Math.sin(a) * r - 0.03) : s.moveTo(Math.cos(a) * r, Math.sin(a) * r - 0.03);
+    }
+    s.closePath();
+    const h = new THREE.Path();
+    h.absarc(0, -0.03, 0.085, 0, Math.PI * 2, true);
+    s.holes.push(h);
+    const g = new THREE.ExtrudeGeometry(s, { depth: 0.07, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.012, bevelSegments: 2, curveSegments: 12 });
+    g.translate(0, 0, -0.035);
+    return g;
+  }
+  if (kind === "ggtower") {
+    // San Francisco's coin: a Golden Gate tower in gold, its two legs tapering up to the crown, the struts between
+    // them, the tall portals between the struts punched through
+    const s = new THREE.Shape(),
+      xo = (y) => 0.27 - (0.05 * (y + 0.45)) / 0.9, // a leg's outer edge at height y
+      xi = (y) => 0.13 - (0.025 * (y + 0.45)) / 0.9; // and its inner edge
+    [[-xo(-0.45), -0.45], [-xo(0.45), 0.45], [xo(0.45), 0.45], [xo(-0.45), -0.45], [xi(-0.45), -0.45], [xi(-0.16), -0.16], [-xi(-0.16), -0.16], [-xi(-0.45), -0.45]]
+      .forEach(([x, y], i) => (i ? s.lineTo(x, y) : s.moveTo(x, y)));
+    s.closePath();
+    for (const [y0, y1] of [[-0.1, 0.08], [0.13, 0.25], [0.3, 0.37]]) {
+      const h = new THREE.Path(), a = xi(y0), c = xi(y1), k = Math.min(0.03, (y1 - y0) / 3);
+      [[-a, y0], [a, y0], [c, y1 - k], [c - k, y1], [-c + k, y1], [-c, y1 - k]].forEach(([x, y], i) => (i ? h.lineTo(x, y) : h.moveTo(x, y)));
+      h.closePath();
+      s.holes.push(h);
+    }
+    const g = new THREE.ExtrudeGeometry(s, { depth: 0.07, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.012, bevelSegments: 2, curveSegments: 4 });
+    g.translate(0, 0, -0.035);
+    return g;
+  }
+  if (kind === "matryoshka") {
+    // Moscow's matryoshka: the doll's own outline, her face and the flower on her apron punched through. The outline is
+    // the union of her round head and her body, traced by casting rays from a point inside both
+    const s = new THREE.Shape(),
+      C = [0, 0.1],
+      pts = [];
+    for (let k = 0; k < 72; k++) {
+      const a = (k / 72) * Math.PI * 2,
+        dx = Math.cos(a),
+        dy = Math.sin(a);
+      const rx = 0.31,
+        ry = 0.33,
+        ey = C[1] + 0.1;
+      const A = (dx / rx) ** 2 + (dy / ry) ** 2,
+        B = (2 * ey * dy) / ry ** 2,
+        Cc = (ey / ry) ** 2 - 1;
+      const tE = (-B + Math.sqrt(B * B - 4 * A * Cc)) / (2 * A);
+      const hy = 0.3 - C[1],
+        r = 0.18,
+        bb = -2 * (dy * hy),
+        disc = bb * bb - 4 * (hy * hy - r * r);
+      const tH = disc > 0 ? (-bb + Math.sqrt(disc)) / 2 : 0;
+      const t = Math.max(tE, tH);
+      pts.push([C[0] + dx * t, Math.max(C[1] + dy * t, -0.36)]); // she stands on a flat base
+    }
+    s.moveTo(...pts[0]);
+    for (const p of pts.slice(1)) s.lineTo(...p);
+    s.closePath();
+    const face = new THREE.Path();
+    face.absarc(0, 0.3, 0.105, 0, Math.PI * 2, true);
+    const heart = new THREE.Path(); // the heart on her apron
+    heart.moveTo(0, -0.22);
+    heart.bezierCurveTo(-0.12, -0.14, -0.1, -0.03, 0, -0.08);
+    heart.bezierCurveTo(0.1, -0.03, 0.12, -0.14, 0, -0.22);
+    s.holes.push(face, heart);
+    const g = new THREE.ExtrudeGeometry(s, { depth: 0.07, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.012, bevelSegments: 2, curveSegments: 20 });
+    g.translate(0, -0.025, -0.035);
+    return g;
+  }
+  if (kind === "tulip") {
+    // Istanbul's tulip punched through a gold coin: the cup with its three pointed petals on its stem, a leaf either side
+    const s = new THREE.Shape();
+    s.absarc(0, 0, 0.43, 0, Math.PI * 2, false);
+    const hole = (pts) => {
+      const h = new THREE.Path();
+      pts.forEach(([x, y], i) => (i ? h.lineTo(x, y) : h.moveTo(x, y)));
+      h.closePath();
+      s.holes.push(h);
+    };
+    hole([[0.018, -0.3], [0.018, -0.03], [0.09, -0.01], [0.135, 0.06], [0.15, 0.14], [0.13, 0.225], [0.06, 0.155], [0, 0.275],
+      [-0.06, 0.155], [-0.13, 0.225], [-0.15, 0.14], [-0.135, 0.06], [-0.09, -0.01], [-0.018, -0.03], [-0.018, -0.3]]);
+    hole([[-0.045, -0.285], [-0.075, -0.2], [-0.13, -0.125], [-0.205, -0.055], [-0.165, -0.135], [-0.115, -0.205], [-0.075, -0.275]]);
+    hole([[0.045, -0.255], [0.075, -0.18], [0.13, -0.115], [0.19, -0.075], [0.15, -0.145], [0.105, -0.205], [0.07, -0.26]]);
+    const g = new THREE.ExtrudeGeometry(s, { depth: 0.07, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.012, bevelSegments: 2, curveSegments: 20 });
+    g.translate(0, 0, -0.035);
+    return g;
+  }
   if (kind === "boba") {
     // a bubble-tea coin: the cup punched through it under its domed lid, the straw stuck in at a slant, and the pearls
     // left standing in the bottom of the window

@@ -29,6 +29,14 @@ export const CHARACTERS = [
     skin: '#e8c4a0', top: '#d8202a', pants: '#f2c230', shoes: '#1a1a1e', sole: '#ffd166', hat: '#d8202a', hair: '#f6f4ee', accent: '#ffd166', pack: '#d8202a', trail: '#ff3d7f' },
   { id: 'nezha', name: '电音三太子', en: 'NEON NEZHA', price: 6000, desc: '台湾庙会里跳电音舞的三太子：大大的娃娃头戴着墨镜、含着奶嘴，头顶两个发髻，金甲红肚兜，飘着混天绫，脚踩一对呼呼转的风火轮', style: 'nezha',
     skin: '#f8e0cc', top: '#f2b830', pants: '#c8202a', shoes: '#1a1a1e', sole: '#ff7a1a', hat: '#141414', hair: '#141414', accent: '#ffd166', pack: '#e8202a', trail: '#ff9a2a' },
+  { id: 'dondurma', name: '冰淇淋小哥', en: 'DONDURMACI', price: 6500, desc: '伊斯坦布尔街头卖土耳其冰淇淋的小哥：头戴红色菲斯帽、留着八字胡，红马甲上绣着金线，手里那根长铁棒挑着一大团能拉丝的冰淇淋，最爱逗客人，边跑边甩', style: 'dondurma',
+    skin: '#e0b08a', top: '#f6f2ea', pants: '#1e1e28', shoes: '#3a2418', sole: '#ffd166', hat: '#c8102e', hair: '#1e1410', accent: '#ffd166', pack: '#8a1428', trail: '#ff8ab8' },
+  { id: 'swan', name: '小天鹅', en: 'BALLERINA', price: 7000, desc: '莫斯科大剧院的芭蕾少女，《天鹅湖》里的白天鹅：白色蓬蓬纱裙、缀着银光的胸衣、发髻上一圈白羽毛冠，脚穿粉色足尖鞋；站着时双臂像天鹅的翅膀一样轻轻起伏', style: 'swan',
+    skin: '#f4dcc8', top: '#f6f6fa', pants: '#f2dce2', shoes: '#f4b8c4', sole: '#ffd6e0', hat: '#ffffff', hair: '#3a2418', accent: '#dfe8ff', pack: '#ffffff', trail: '#cfe0ff' },
+  { id: 'hippie', name: '嬉皮少女', en: 'FLOWER CHILD', price: 7500, desc: '1967 年“爱之夏”海特街上的花童：长长的直发中分，戴着雏菊花环和圆形粉色墨镜，扎染 T 恤外面套着流苏麂皮背心，胸前挂着和平标志，穿一条喇叭裤和凉鞋；待机时举手比出 ✌，跟着音乐轻轻摇摆', style: 'hippie',
+    skin: '#f4d8c0', top: '#ff7ab8', pants: '#5a7ab0', shoes: '#8a5a3a', sole: '#ffd166', hat: '#ffffff', hair: '#b8803a', accent: '#d8dce4', pack: '#a8703a', trail: '#ff8ad8' },
+  { id: 'surfer', name: '冲浪少年', en: 'SURFER', price: 8000, desc: '在威尼斯海滩边长大的冲浪少年：头发被太阳晒褪成金色，墨镜推到头顶，敞开的夏威夷衬衫里套着白背心，脖子上一串贝壳项链，冲浪短裤配人字拖，背上斜挎一块冲浪板；待机时比出 shaka 手势（拇指和小指伸开），像踩在浪板上一样压低身子，左右晃着找平衡', style: 'surfer',
+    skin: '#d49a6a', top: '#2ab4a8', pants: '#ff7a3a', shoes: '#ff5a3a', sole: '#ffd166', hat: '#1a1a22', hair: '#f2d27a', accent: '#f4f0e8', pack: '#f4f0e8', trail: '#3ad8ff' },
 ];
 // triangular pennant for the opera general's back flags (靠旗)
 const FLAG = new THREE.BufferGeometry();
@@ -42,7 +50,40 @@ const BOX = new THREE.BoxGeometry(1, 1, 1);
 const SPH = new THREE.SphereGeometry(0.5, 16, 12);
 const CYL = new THREE.CylinderGeometry(0.5, 0.5, 1, 14);
 const CONE = new THREE.ConeGeometry(0.5, 1, 16, 1, true);
+const FEZ = new THREE.CylinderGeometry(0.42, 0.5, 1, 18);
 
+// a tie-dyed shirt: bright bands swirling out from the middle, their edges bleeding
+let tieDyeMat = null;
+function tieDye() {
+  if (tieDyeMat) return tieDyeMat;
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d'), cols = ['#ff3d7f', '#ffd23d', '#39d8ff', '#7cff5a', '#b46bff', '#ff7a2a'];
+  for (let y = 0; y < 128; y++) for (let x = 0; x < 128; x++) {
+    const dx = x - 64, dy = y - 64, r = Math.hypot(dx, dy), a = Math.atan2(dy, dx), k = Math.floor((r / 9 + a / 1.2 + 12) % cols.length);
+    g.fillStyle = cols[(k + cols.length) % cols.length]; g.fillRect(x, y, 1, 1);
+  }
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  tieDyeMat = std({ map: tex, roughness: 0.75 });
+  return tieDyeMat;
+}
+// an aloha shirt: big hibiscus flowers and palm leaves on teal
+let alohaMat = null;
+function aloha() {
+  if (alohaMat) return alohaMat;
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = '#1ea8a0'; g.fillRect(0, 0, 128, 128);
+  for (let k = 0; k < 12; k++) { g.fillStyle = k % 2 ? '#1a6a4a' : '#2a8a5a'; g.beginPath(); g.ellipse(Math.random() * 128, Math.random() * 128, 16, 5, Math.random() * 6, 0, Math.PI * 2); g.fill(); }
+  for (let k = 0; k < 8; k++) {   // five round petals, the dark eye, the stamen
+    const x = 8 + Math.random() * 112, y = 8 + Math.random() * 112, r = 7 + Math.random() * 5, col = ['#ff4a3a', '#ff8a2a', '#f4f0e8', '#ff5aa0'][k % 4];
+    for (let p = 0; p < 5; p++) { const a = (p / 5) * Math.PI * 2; g.fillStyle = col; g.beginPath(); g.arc(x + Math.cos(a) * r * 0.6, y + Math.sin(a) * r * 0.6, r * 0.6, 0, Math.PI * 2); g.fill(); }
+    g.fillStyle = '#8a1a2a'; g.beginPath(); g.arc(x, y, r * 0.3, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#ffd23d'; g.fillRect(x, y - r * 0.9, 1.5, r * 0.8);
+  }
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  alohaMat = std({ map: tex, roughness: 0.7 });
+  return alohaMat;
+}
 const mc = new Map();
 export function M(hex, rough = 0.55, metal = 0.05) {
   const k = `${hex}|${rough}|${metal}`;
@@ -63,7 +104,7 @@ function part(geo, mat, x, y, z, sx, sy, sz, parent) {
 const grp = (parent, x = 0, y = 0, z = 0) => { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; };
 
 export function buildCharacter(d) {
-  const robot = d.style === 'robot', panda = d.style === 'panda', guard = d.style === 'guard', neko = d.style === 'neko', rabbit = d.style === 'rabbit', liberty = d.style === 'liberty', koala = d.style === 'koala', guardsman = d.style === 'guardsman', naxi = d.style === 'naxi', paris = d.style === 'paris', lion = d.style === 'lion', nezha = d.style === 'nezha';
+  const robot = d.style === 'robot', panda = d.style === 'panda', guard = d.style === 'guard', neko = d.style === 'neko', rabbit = d.style === 'rabbit', liberty = d.style === 'liberty', koala = d.style === 'koala', guardsman = d.style === 'guardsman', naxi = d.style === 'naxi', paris = d.style === 'paris', lion = d.style === 'lion', nezha = d.style === 'nezha', dondurma = d.style === 'dondurma', swan = d.style === 'swan', hippie = d.style === 'hippie', surfer = d.style === 'surfer';
   const root = new THREE.Group();
   const body = grp(root, 0, 0.6, 0);         // roll / lean pivot
   const inner = grp(body, 0, -0.6, 0);
@@ -95,7 +136,7 @@ export function buildCharacter(d) {
   const torso = grp(hips, 0, 0, 0);
   let tail = null;
   part(RB, mTop, 0, 0.32, guard ? 0.03 : 0, 0.52 * wide, 0.62, guard ? 0.4 : 0.3, torso);
-  if (!panda && !guard && !neko && !rabbit && !liberty && !koala && !guardsman && !naxi && !paris && !lion && !nezha) part(BOX, E(d.accent, 2.6), 0, 0.38, -0.152, 0.53, 0.05, 0.012, torso);
+  if (!panda && !guard && !neko && !rabbit && !liberty && !koala && !guardsman && !naxi && !paris && !lion && !nezha && !dondurma && !swan && !hippie && !surfer) part(BOX, E(d.accent, 2.6), 0, 0.38, -0.152, 0.53, 0.05, 0.012, torso);
   if (robot) {
     part(SPH, E(d.accent, 3), 0, 0.42, -0.16, 0.14, 0.14, 0.05, torso);
   }
@@ -150,6 +191,48 @@ export function buildCharacter(d) {
     const sash = M(d.pack, 0.6);
     part(TOR, sash, 0, 0.1, 0.04, 0.9, 0.5, 0.5, tail).rotation.x = Math.PI / 2;
     for (const sx of [-1, 1]) { part(BOX, sash, sx * 0.24, -0.22, 0.16, 0.09, 0.52, 0.025, tail).rotation.set(-0.5, 0, sx * 0.22); part(BOX, sash, sx * 0.33, -0.58, 0.36, 0.08, 0.42, 0.025, tail).rotation.set(-0.95, 0, sx * 0.3); }
+  } else if (dondurma) {
+    const vest = M(d.pack, 0.6), gold = M(d.accent, 0.3, 0.7);
+    for (const sx of [-1, 1]) {
+      part(RB, vest, sx * 0.17, 0.36, -0.01, 0.2, 0.56, 0.33, torso);                   // the vest's fronts, open over the white shirt
+      part(BOX, gold, sx * 0.075, 0.36, -0.168, 0.025, 0.54, 0.012, torso);              // their gold edging
+      for (let k = 0; k < 3; k++) part(SPH, gold, sx * 0.17, 0.5 - k * 0.14, -0.172, 0.07, 0.05, 0.015, torso);   // the embroidered scrolls
+    }
+    part(RB, vest, 0, 0.36, 0.06, 0.54, 0.56, 0.2, torso);                                // its back
+    part(BOX, M(d.hat, 0.6), 0, 0.07, 0, 0.56, 0.12, 0.34, torso);                        // the red sash
+    part(BOX, gold, 0, 0.07, -0.172, 0.56, 0.03, 0.01, torso);
+  } else if (swan) {
+    const tulle = M(d.pack, 0.9), silver = M(d.accent, 0.25, 0.6);
+    part(CYL, tulle, 0, 0.04, 0, 1.0, 0.07, 0.92, torso);                              // the tutu: layers of tulle standing out flat from the hips
+    part(CYL, M('#f8eef2', 0.9), 0, 0.0, 0, 0.9, 0.06, 0.84, torso);
+    part(CYL, M('#ffffff', 0.9), 0, 0.085, 0, 0.82, 0.05, 0.76, torso);
+    for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; part(SPH, tulle, Math.cos(a) * 0.47, 0.03, Math.sin(a) * 0.43, 0.14, 0.06, 0.14, torso); }   // its ruffled edge
+    for (let k = 0; k < 9; k++) part(SPH, silver, -0.16 + (k % 3) * 0.16, 0.22 + Math.floor(k / 3) * 0.12, -0.155, 0.04, 0.04, 0.015, torso);   // the bodice's sequins
+    part(BOX, silver, 0, 0.6, -0.01, 0.42, 0.05, 0.31, torso);
+  } else if (hippie) {
+    part(RB, tieDye(), 0, 0.32, 0, 0.535, 0.625, 0.31, torso);                          // the tie-dyed shirt
+    const suede = M(d.pack, 0.85);
+    for (const sx of [-1, 1]) {
+      part(RB, suede, sx * 0.19, 0.36, -0.01, 0.16, 0.5, 0.33, torso);                 // the suede vest, open at the front
+      for (let k = 0; k < 5; k++) part(BOX, suede, sx * (0.13 + k * 0.028), 0.07, -0.16, 0.014, 0.16, 0.012, torso);   // its fringe
+    }
+    part(RB, suede, 0, 0.36, 0.07, 0.54, 0.5, 0.18, torso);
+    const silver = M(d.accent, 0.25, 0.75);
+    part(TOR, silver, 0, 0.3, -0.162, 0.13, 0.13, 0.1, torso);                          // the peace sign on its thong
+    part(BOX, silver, 0, 0.3, -0.166, 0.012, 0.11, 0.01, torso);
+    for (const sx of [-1, 1]) part(BOX, silver, sx * 0.025, 0.27, -0.166, 0.01, 0.055, 0.01, torso).rotation.z = sx * 0.8;
+    part(BOX, M('#3a2a1a', 0.8), 0, 0.46, -0.16, 0.008, 0.26, 0.006, torso).rotation.z = 0.0;
+  } else if (surfer) {
+    part(RB, aloha(), 0, 0.32, 0, 0.535, 0.625, 0.31, torso);                          // the aloha shirt, hanging open
+    part(BOX, M('#f4f2ec', 0.7), 0, 0.3, -0.158, 0.17, 0.52, 0.012, torso);            // the white vest under it
+    for (const sx of [-1, 1]) part(BOX, aloha(), sx * 0.11, 0.6, -0.15, 0.12, 0.05, 0.03, torso).rotation.z = sx * 0.5;   // its collar
+    for (let k = 0; k < 11; k++) { const a = Math.PI * (0.15 + (0.7 * k) / 10); part(SPH, M('#f4ecdc', 0.4), Math.cos(a) * 0.14, 0.62 - Math.sin(a) * 0.1, -0.168, 0.035, 0.035, 0.035, torso); }   // a string of puka shells
+    part(BOX, M('#2a2a30', 0.6), 0, 0.33, -0.166, 0.05, 0.72, 0.01, torso).rotation.z = 0.62;   // the board's strap across his chest
+    const board = grp(torso, 0, 0.5, 0.42); board.rotation.z = 0.3;                      // the board slung on his back, its nose up past his shoulder (clear of the jetpack)
+    part(SPH, M(d.pack, 0.35), 0, 0, 0, 0.42, 1.35, 0.07, board);
+    part(BOX, M('#ff5a3a', 0.5), 0, 0, -0.004, 0.05, 1.22, 0.074, board);              // the stripe down it
+    part(BOX, M('#1a6ab0', 0.5), 0, -0.56, 0.05, 0.012, 0.12, 0.1, board);              // the fin
+    part(BOX, M('#2a2a30', 0.6), 0, 0.02, -0.12, 0.08, 0.08, 0.22, board);              // the strap's buckle against his back
   } else if (koala) {
     part(RB, M(d.pack, 0.8), 0, 0.32, -0.12, 0.36, 0.44, 0.1, torso);                 // pale chest fur
   } else if (liberty) {
@@ -277,6 +360,52 @@ export function buildCharacter(d) {
     part(BOX, M(d.accent, 0.3, 0.7), 0, 0.03, -0.13, 0.32, 0.025, 0.06, head);        // brass chin strap
     part(SPH, M('#c8102e', 0.8), 0.2, 0.5, 0.02, 0.07, 0.24, 0.07, head);             // red plume on the right
     part(BOX, M('#3a2618'), 0, 0.1, -0.152, 0.12, 0.02, 0.01, head);                  // a stern mouth
+  } else if (dondurma) {
+    part(RB, M(d.hair, 0.7), 0, 0.27, 0.04, 0.34, 0.12, 0.32, head);                  // black hair under the fez
+    part(FEZ, M(d.hat, 0.7), 0, 0.42, 0.01, 0.3, 0.24, 0.3, head);                    // the fez
+    part(CYL, M('#141414', 0.6), 0, 0.545, 0.01, 0.04, 0.02, 0.04, head);
+    tail = grp(head, 0, 0.54, 0.01);                                                    // its black tassel, swinging as he runs
+    part(CYL, M('#141414', 0.8), 0, -0.02, 0.09, 0.03, 0.2, 0.03, tail).rotation.x = 1.2;
+    part(BOX, M(d.hair, 0.6), 0, 0.105, -0.155, 0.17, 0.045, 0.02, head);              // a big moustache
+    for (const sx of [-1, 1]) part(BOX, M(d.hair, 0.6), sx * 0.075, 0.27, -0.152, 0.06, 0.018, 0.01, head);   // and eyebrows
+  } else if (swan) {
+    part(RB, M(d.hair, 0.7), 0, 0.27, 0.03, 0.34, 0.16, 0.33, head);                  // hair drawn back smooth
+    part(SPH, M(d.hair, 0.7), 0, 0.36, 0.12, 0.18, 0.16, 0.16, head);                 // the bun
+    for (const sx of [-1, 1]) {                                                       // the crown of white feathers either side of it
+      part(SPH, M(d.hat, 0.95), sx * 0.13, 0.38, 0.06, 0.1, 0.18, 0.08, head).rotation.z = -sx * 0.6;
+      part(SPH, M(d.hat, 0.95), sx * 0.07, 0.42, 0.1, 0.08, 0.14, 0.07, head).rotation.z = -sx * 0.3;
+      part(SPH, M('#ff9aa8', 0.7), sx * 0.11, 0.12, -0.14, 0.06, 0.04, 0.02, head);  // rosy cheeks
+    }
+    part(BOX, M(d.accent, 0.25, 0.6), 0, 0.33, -0.12, 0.26, 0.035, 0.08, head);       // a silver tiara band
+    part(BOX, M('#d84a6a', 0.5), 0, 0.09, -0.152, 0.06, 0.022, 0.01, head);           // her lips
+  } else if (hippie) {
+    const hair = M(d.hair, 0.7);
+    part(RB, hair, 0, 0.29, 0.03, 0.35, 0.14, 0.34, head);                            // long straight hair, parted in the middle
+    for (const sx of [-1, 1]) part(RB, hair, sx * 0.17, 0.12, 0.02, 0.06, 0.38, 0.3, head);
+    part(RB, hair, 0, 0.15, 0.13, 0.35, 0.4, 0.1, head);                                // the back of her head, under what swings
+    tail = grp(head, 0, 0.3, 0.15);                                                     // the length of it down her back, swinging as she runs
+    part(RB, hair, 0, -0.26, 0.02, 0.3, 0.56, 0.08, tail);
+    for (let k = 0; k < 10; k++) {                                                      // the crown of daisies, a few coloured flowers among them
+      const a = (k / 10) * Math.PI * 2, x = Math.sin(a) * 0.19, z = -Math.cos(a) * 0.18 + 0.02;
+      part(SPH, M(k % 3 === 1 ? ['#ff5a8a', '#ff9a2a', '#8ab8ff'][k % 4 % 3] : d.hat, 0.6), x, 0.36, z, 0.08, 0.05, 0.08, head);
+      if (k % 3 !== 1) part(SPH, M('#ffd23d', 0.5), x * 1.04, 0.38, z * 1.04, 0.035, 0.03, 0.035, head);
+    }
+    for (const sx of [-1, 1]) {
+      part(CYL, E('#ff7aa8', 1.1), sx * 0.075, 0.2, -0.158, 0.1, 0.012, 0.1, head).rotation.x = Math.PI / 2;   // the round, rose-tinted glasses
+      part(TOR, M('#d8b048', 0.3, 0.7), sx * 0.075, 0.2, -0.162, 0.11, 0.11, 0.06, head);
+    }
+    part(BOX, M('#d8b048', 0.3, 0.7), 0, 0.21, -0.164, 0.05, 0.012, 0.01, head);
+    part(BOX, M('#d85a6a', 0.5), 0, 0.09, -0.152, 0.06, 0.022, 0.01, head);           // her smile
+  } else if (surfer) {
+    const hair = M(d.hair, 0.85);
+    part(RB, hair, 0, 0.29, 0.03, 0.35, 0.15, 0.34, head);                            // shaggy and sun-bleached
+    for (let k = 0; k < 5; k++) part(BOX, hair, -0.12 + k * 0.06, 0.28, -0.15, 0.07, 0.1, 0.04, head).rotation.z = (k - 2) * 0.18;   // the fringe falling into his eyes
+    for (const sx of [-1, 1]) part(RB, hair, sx * 0.17, 0.2, 0.04, 0.06, 0.24, 0.26, head);
+    part(RB, hair, 0, 0.18, 0.15, 0.34, 0.26, 0.08, head);
+    part(BOX, M('#1a1a22', 0.3), 0, 0.37, -0.06, 0.3, 0.035, 0.05, head);              // the sunglasses pushed up on his head
+    for (const sx of [-1, 1]) part(BOX, E('#ff7a3a', 1.2), sx * 0.075, 0.375, -0.09, 0.11, 0.05, 0.02, head);   // their mirrored orange lenses
+    for (const sx of [-1, 1]) part(BOX, M('#c8a050', 0.6), sx * 0.075, 0.265, -0.152, 0.06, 0.018, 0.01, head);   // his eyebrows
+    part(BOX, M('#7a3a2a', 0.5), 0, 0.09, -0.152, 0.1, 0.022, 0.01, head);            // the grin
   } else if (koala) {
     for (const sx of [-1, 1]) {                                                       // big round fluffy ears
       part(SPH, mSkin, sx * 0.19, 0.33, 0.02, 0.22, 0.22, 0.12, head);
@@ -339,7 +468,30 @@ export function buildCharacter(d) {
   if (panda) {
     AL.sh.children[0].material = M('#1b1b1f'); AR.sh.children[0].material = M('#1b1b1f');
   }
+  if (dondurma) {   // the long steel paddle, a lump of stretchy ice cream on its end with a cone stuck in it
+    part(CYL, M('#d8dce0', 0.25, 0.85), 0, -0.86, 0, 0.035, 1.1, 0.035, AR.el);
+    part(SPH, M('#f8f4ec', 0.5), 0, -1.43, 0, 0.22, 0.2, 0.22, AR.el);
+    part(SPH, M('#ff9ac0', 0.5), 0.03, -1.5, 0, 0.15, 0.13, 0.15, AR.el);
+    part(CONE, M('#d8a050', 0.7), 0, -1.6, 0, 0.11, 0.2, 0.11, AR.el).rotation.x = Math.PI;
+  }
   if (nezha) for (const A of [AL, AR]) part(CYL, M(d.accent, 0.3, 0.7), 0, -0.22, 0, 0.16, 0.08, 0.16, A.el);   // gold bracelets
+  if (hippie) {
+    for (const F of [L, R]) part(FEZ, mPants, 0, -0.36, 0, 0.3, 0.2, 0.32, F.knee);   // the bell-bottoms flaring over her sandals
+    for (const sx of [-1, 1]) part(BOX, mSkin, sx * 0.03, -0.43, -0.02, 0.035, 0.14, 0.035, AR.el).rotation.z = sx * 0.28;   // two fingers up: peace
+    for (const A of [AL, AR]) part(CYL, M('#8a5a3a', 0.6), 0, -0.24, 0, 0.15, 0.04, 0.15, A.el);   // leather wristbands
+  }
+  if (surfer) {
+    [L, R].forEach((F, i) => {
+      F.knee.children[0].material = mSkin;                                             // bare shins under the board shorts
+      part(CYL, mPants, 0, -0.04, 0, 0.25, 0.12, 0.27, F.knee);                         // the shorts' hem at the knee
+      part(BOX, M('#f4f0e8', 0.6), (i ? 1 : -1) * 0.107, -0.22, 0, 0.012, 0.48, 0.06, F.thigh);   // the white stripe down their sides
+      F.foot.children[0].material = mSkin;                                             // bare feet in flip-flops: the thong between the toes
+      for (const sx of [-1, 1]) part(BOX, M(d.shoes, 0.5), sx * 0.05, 0.03, -0.14, 0.02, 0.025, 0.17, F.foot).rotation.y = sx * 0.45;
+    });
+    part(BOX, mSkin, -0.065, -0.42, -0.02, 0.035, 0.12, 0.035, AR.el).rotation.z = 0.75;   // the shaka: the thumb and the little finger out
+    part(BOX, mSkin, 0.065, -0.42, -0.02, 0.035, 0.12, 0.035, AR.el).rotation.z = -0.75;
+    part(CYL, M('#ffd23d', 0.6), 0, -0.24, 0, 0.15, 0.04, 0.15, AL.el);                // a woven bracelet
+  }
   return { root, body, inner, hips, torso, head, tail, L, R, AL, AR, spin, def: d };
 }
 
@@ -360,6 +512,7 @@ export class Animator {
           aL: -sp * 0.9, aR: sp * 0.9, zL: -0.12, zR: 0.12, eL: 1.35, eR: 1.35, tx: -0.2, bob: Math.abs(Math.cos(this.ph)) * 0.07, hy: 0, tz: 0 };
         if (s.mode === 'stumble') { P.tz = Math.sin(t * 28) * 0.35; P.aL = -2.2; P.aR = -1.6; P.zL = -0.9; P.zR = 0.9; }
         else if (r.def.style === 'liberty') { P.aR = -2.75; P.eR = 0.2; P.zR = 0.15; }   // runs with the torch held high
+        else if (r.def.style === 'dondurma') { P.aR = -2.65 + Math.sin(this.ph) * 0.12; P.eR = 0.25; P.zR = 0.18; }   // the paddle held up like a banner
         break;
       }
       case 'jump':
@@ -383,6 +536,10 @@ export class Animator {
         if (r.def.style === 'neko') { const w = Math.sin(t * 5); P.aL = -2.7 + w * 0.3; P.eL = 1.0 + w * 0.45; P.zL = -0.2; }   // beckoning paw
         if (r.def.style === 'liberty') { P.aR = -2.95; P.eR = 0.1; P.zR = 0.1; }   // torch raised
         if (r.def.style === 'guardsman') { P.aL = 0.02; P.aR = 0.02; P.eL = 0.12; P.eR = 0.12; P.zL = -0.06; P.zR = 0.06; P.hy = 0; P.bob = 0; }   // standing to attention
+        if (r.def.style === 'dondurma') { const w = Math.sin(t * 5); P.aR = -2.2 + w * 0.6; P.eR = 0.5 + w * 0.45; P.zR = 0.22; P.hy = Math.sin(t * 1.3) * 0.5; }   // teasing a customer with the paddle
+        if (r.def.style === 'swan') { const w = Math.sin(t * 2.2); P.aL = -0.1; P.aR = -0.1; P.zL = -1.25 - w * 0.28; P.zR = 1.25 + w * 0.28; P.eL = 0.35 + Math.sin(t * 2.2 + 0.9) * 0.3; P.eR = P.eL; P.hy = Math.sin(t * 0.7) * 0.3; }   // Odette's arms, rising and falling like wings
+        if (r.def.style === 'hippie') { const w = Math.sin(t * 1.8); P.aR = -2.75; P.eR = 0.35 + Math.sin(t * 3.6) * 0.08; P.zR = 0.3; P.aL = 0.1; P.zL = -0.25 - w * 0.08; P.hy = w * 0.35; P.tz = w * 0.08; P.bob = Math.abs(Math.sin(t * 3.6)) * 0.03; }   // peace, swaying to the music
+        if (r.def.style === 'surfer') { const w = Math.sin(t * 1.6); P.aR = -1.25; P.zR = 1.0 + w * 0.08; P.eR = 1.0; P.aL = -0.5 - w * 0.15; P.zL = -0.75 - w * 0.2; P.eL = 0.45; P.tL = 0.4; P.tR = 0.25; P.kL = -0.55; P.kR = -0.45; P.tz = w * 0.14; P.hy = -w * 0.3; P.bob = -0.05 + Math.abs(w) * 0.03; }   // shaka, riding a wave only he can see
         if (r.def.style === 'nezha') { const w = Math.sin(t * 8); P.aL = -1.4 - w; P.aR = -1.4 + w; P.eL = 1.2; P.eR = 1.2; P.zL = -0.45; P.zR = 0.45; P.hy = Math.sin(t * 4) * 0.35; P.bob = Math.abs(w) * 0.05; P.tz = Math.sin(t * 4) * 0.12; }   // the Neon Gods' techno dance
       }
     }

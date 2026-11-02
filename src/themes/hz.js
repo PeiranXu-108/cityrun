@@ -1,12 +1,26 @@
 // Hangzhou: misty blue-hour West Lake, white-wall black-tile houses, lanterns, pagodas, Fuxing bullet trains.
+// The run goes round a loop of three stretches: West Lake's streets (now with their vendors, kiosks and newsstands), the
+// plane-tree avenue of Beishan Street, and the Qiantang at Qianjiang New City, where the towers of both banks play the
+// light show (hz_kit.js, hz_show.js, hz_landmarks.js); then back through the avenue to the lake.
 import { THREE, Batcher, VC, G, std, basic, hdr, windowTex, stripeTex, buildingGeo, canvasTex,
-  CHUNK_LEN, rand, randi, pick, chance } from '../core.js';
+  CHUNK_LEN, rand, randi, pick, chance, clamp, smooth } from '../core.js';
 import { barrierStyle, coinGeometry, coinMaterial } from '../props.js';
-import { treeKit } from './trees.js';
+import { treeKit, wutongKit } from './trees.js';
 import { makeTrack, facadeMat, lamp, skyline, skyTex, SKY_VC, polar, at, EDGE, DISC, waterMat, screenMat, screenTint, people, RING } from './common.js';
+import { makeKit, GLYPHS as KIT_GLYPHS, SIGN } from './hz_kit.js';
+import { makeShow } from './hz_show.js';
+import { hzLandmarks } from './hz_landmarks.js';
 
 const RED = '#d7262e', TILE = '#2b2f36', WALL = '#d6d1c4';
 const SIGNS = ['龙井茶', '酒', '客栈', '丝绸', '面馆', '西湖', '河坊街', '茶', '药铺', '书局'];
+// every character the city's canvases draw (main.js loads them before the textures are painted)
+export const GLYPHS = [...new Set(KIT_GLYPHS + SIGNS.join('') + '西湖断桥苏堤灵隐钱塘最忆是杭州亚运')].join('');
+
+// The loop, chunk by chunk (each landmark heads four chunks, ROUTE gives their order): West Lake, the avenue on its lake
+// side and its city side, the Qiantang, the avenue again. The run starts at the Three Pools.
+const ROUTE = ['santan', 'leifeng', 'balcony', 'qianjiang', 'lightshow'];
+const ZONES = ['lake', 'lake', 'lake', 'lake', 'lake', 'lake', 'avenueL', 'avenueR',
+  'river', 'river', 'river', 'river', 'river', 'river', 'river', 'river', 'river', 'river', 'avenueR', 'avenueL'];
 
 // vertical shop-sign atlas (dark lacquer boards with gold characters)
 function verticalSigns() {
@@ -39,8 +53,8 @@ function plaqueTex(text) {
 
 export default {
   id: 'hz', name: '杭州', en: 'HANGZHOU', tagline: '人间天堂 · 西湖烟雨',
-  blurb: '暮色里的西湖，红灯笼、白墙黛瓦，复兴号从湖边疾驰而过。三潭映月的烛光、钱江新城的金球与大剧院、雷峰塔和断桥一路相伴。',
-  sights: ['三潭映月', '钱江新城 金球 · 大剧院', '雷峰塔 · 断桥'],
+  blurb: '暮色里的西湖，红灯笼、白墙黛瓦，复兴号从湖边疾驰而过。湖边有糖画摊、卖莲蓬的阿婆、葱包桧和定胜糕的小车、灰色的小商亭、墨绿色的报刊亭和成排的小红车，三潭映月的烛光、雷峰塔和断桥一路相伴；穿过北山街两侧树冠合拢的梧桐大道，来到钱塘江边的钱江新城：城市阳台悬在江上，金球与新月形的大剧院“日月同辉”，两岸几十栋高楼连成一幅灯光秀，倒映在江面上，再沿着梧桐大道回到西湖。',
+  sights: ['三潭映月', '雷峰塔 · 断桥', '北山街 · 梧桐大道', '城市阳台', '钱江新城 金球 · 大剧院', '钱江灯光秀'],
   accent: '#ff5a6e', accent2: '#ffd77a', portal: '#ff5a6e',
   sky: { top: '#0c1d3d', mid: '#3a6a8a', bot: '#f0b3ae', glow: '#ff9aa8', glowK: 0.4, sun: '#fff4dc',
     sunDir: [0.32, 0.22, -1], sunSize: 0.005, sunK: 1.1, moon: true, cloud: 0.35, cloudColor: '#6f8aa8', horizon: -0.08, stars: true },
@@ -89,6 +103,7 @@ export default {
       }
     };
     const kit = treeKit();
+    const S = makeShow(), K = makeKit(S, { treeKit: kit }), WT = wutongKit();
     const willow = (b, x, z, s = 1, o) => kit.willow(b, x, z, s, o);
     const pavilion = (b, x, z) => {
       b.block(VC.solid, '#9a968e', x, -0.6, z, 6, 1.0, 6);
@@ -144,17 +159,18 @@ export default {
       }
     };
 
-    const decor = () => {
+    const lakeDecor = () => {
       const b = new Batcher();
-      lakeSide(b);
+      const L = lakeSide(b), R = [];   // distances taken on the lakeside walk and along the houses
       if (chance(0.35)) pavilion(b, -rand(16, 24), -rand(15, 65));
       else if (chance(0.5)) boat(b, -rand(16, 30), -rand(15, 65));
       // street side (right)
       houses(b, 1);
-      if (chance(0.5)) bamboo(b, EDGE + 4.5, -rand(10, 70));
+      if (chance(0.5)) { const bz = rand(10, 70); bamboo(b, EDGE + 4.5, -bz); R.push(bz, bz - 3.2); }
       // overhead: lantern strings or a paifang gate
       if (chance(0.4)) {
         const z = -rand(10, 70);
+        L.push(-z); R.push(-z);
         for (const s of [-1, 1]) b.box(VC.solid, '#5a2a22', s * (EDGE + 0.6), 3.6, z, 0.25, 7.2, 0.25);
         for (let k = 0; k <= 10; k++) {
           const t = k / 10, x = -(EDGE + 0.6) + t * 2 * (EDGE + 0.6);
@@ -162,6 +178,7 @@ export default {
         }
       } else if (chance(0.35)) {
         const z = -rand(12, 66), W = EDGE + 1.6;
+        L.push(-z); R.push(-z);
         for (const s of [-1, 1]) { b.box(VC.solid, '#a3262a', s * W, 4.4, z, 0.8, 8.8, 0.8); b.block(VC.solid, '#8d8a84', s * W, 0, z, 1.5, 1.2, 1.5); }
         b.box(VC.solid, '#a3262a', 0, 7.2, z, W * 2 + 1.2, 0.6, 0.7);
         b.box(VC.solid, '#1d2f4a', 0, 8.3, z, W * 2 + 0.6, 0.35, 0.6);
@@ -170,11 +187,14 @@ export default {
         b.box(VC.glow, hdr('#ffd77a', 2.6), 0, 7.5, z + 0.36, W * 2 + 1.2, 0.08, 0.02);
         for (const s of [-1, 1]) lantern(b, s * (W - 1.2), 6.3, z + 0.2, 0.8);
       }
-      return b.build();
+      lakeLife(b, L, R);
+      return K.flushSteam(b.build());
     };
 
     // ---------- landmarks ----------
-    const lakeSide = (b, { willows = true, lotus = 40, modern = false } = {}) => {
+    // returns the distances its trees and lamps took on the walk
+    const lakeSide = (b, { willows = true, lotus = 40, modern = false, lamps = true } = {}) => {
+      const taken = [];
       b.add(G.plane, water, -80, -0.8, -CHUNK_LEN / 2, 150, CHUNK_LEN + 0.5, 1, -Math.PI / 2);
       b.box(VC.solid, modern ? '#5a5f66' : '#9a968e', -(EDGE + 7.2), -0.45, -CHUNK_LEN / 2, 0.6, 0.9, CHUNK_LEN);
       if (modern) {
@@ -188,13 +208,15 @@ export default {
       if (willows) for (let z = rand(2, 6), k = randi(0, 1); z < CHUNK_LEN - 1; z += rand(7.5, 10.5), k++) {
         if (k % 2) kit.peach(b, -(EDGE + 4.4), -z, rand(0.9, 1.15));
         else willow(b, -(EDGE + 4.8), -z, rand(0.95, 1.15));
+        taken.push(z);
       }
       for (let k = 0; k < lotus; k++) {
         const x = -rand(EDGE + 9, 40), z = -rand(0, CHUNK_LEN);
         b.addM(DISC, VC.solid, new THREE.Matrix4().makeScale(rand(1, 2.2), 1, rand(1, 2.2)).setPosition(x, -0.76, z), pick(['#2f6b3a', '#3b7a42', '#2a5e34']));
         if (chance(0.25)) b.add(G.cone8, VC.glow, x, -0.4, z, 0.5, 0.6, 0.5, Math.PI, 0, 0, hdr('#ff8fb0', 1.8));
       }
-      for (let z = rand(6, 14); z < CHUNK_LEN; z += 20) lamp(b, -(EDGE + 1.2), -z, -1, { light: modern ? '#cfe6ff' : '#ffd9a0', k: 3, h: 4.6, pole: '#1d2026' });
+      if (lamps) for (let z = rand(6, 14); z < CHUNK_LEN; z += 20) { lamp(b, -(EDGE + 1.2), -z, -1, { light: modern ? '#cfe6ff' : '#ffd9a0', k: 3, h: 4.6, pole: '#1d2026' }); taken.push(z); }
+      return taken;
     };
 
     // 三潭映月: three stone lantern-pagodas standing in the lake, candlelight through five round holes
@@ -350,6 +372,115 @@ export default {
       return b.build();
     };
 
+    // ---------- the life of the lakeside: vendors on the walk, newsstands, snack carts and bikes along the houses ----------
+    const free = (taken, z, r) => !taken.some((t) => Math.abs(t - z) < r);
+    const slot = (taken, r, z0 = 4, z1 = CHUNK_LEN - 4) => {   // a distance at least r from the taken ones (now taken too)
+      for (let t = 0; t < 14; t++) { const z = rand(z0, z1); if (free(taken, z, r)) { taken.push(z); return z; } }
+      return null;
+    };
+    const lakeLife = (b, L, R) => {
+      const gapsL = [], gapsR = [];
+      // on the walk, between the lamps and the trees: one to three of the lake's vendors; benches facing the water
+      for (let k = randi(1, 3); k > 0; k--) {
+        const kind = pick(['sugarArt', 'lotusSeller', 'kiosk', 'kiosk', 'balloons', 'wreaths', 'portrait', 'serviceDesk']), wide = kind === 'kiosk';
+        const z = slot(L, wide ? 2.7 : 1.9);
+        if (z === null) continue;
+        K[kind](b, -(EDGE + (wide ? 3.0 : 2.65)), -z, -1);
+        gapsL.push([z - 2.2, z + 2.2]);
+      }
+      for (let k = randi(0, 2); k > 0; k--) { const z = slot(L, 1.4); if (z !== null) K.bench(b, -(EDGE + 5.85), -z, Math.PI / 2); }
+      K.strollers(b, -(EDGE + 0.6), -(EDGE + 3.4), 2, CHUNK_LEN - 2, randi(6, 10), { gaps: gapsL });
+      // along the houses: a newsstand, snack carts with their queues, the red bikes, the sorting bins
+      if (chance(0.55)) { const z = slot(R, 2.3); if (z !== null) { K.newsstand(b, EDGE + 4.25, -z, 1); gapsR.push([z - 2, z + 2]); } }
+      for (let k = randi(1, 2); k > 0; k--) { const z = slot(R, 1.9); if (z !== null) { K.snackCart(b, EDGE + 3.25, -z, 1); gapsR.push([z - 1.8, z + 1.8]); } }
+      if (chance(0.35)) {
+        const n = randi(5, 9), z = slot(R, n * 0.36 + 1.4);
+        if (z !== null) { K.bikes(b, EDGE + 4.75, -z + n * 0.36, n, 1); gapsR.push([z - n * 0.36 - 1, z + n * 0.36 + 1]); }
+      }
+      if (chance(0.4)) { const z = slot(R, 1.3); if (z !== null) K.bins(b, EDGE + 5.6, -z, 1); }
+      K.strollers(b, EDGE + 0.6, EDGE + 2.6, 2, CHUNK_LEN - 2, randi(5, 9), { gaps: gapsR });
+    };
+
+    // ---------- the plane-tree avenue (北山街) between the lake and the river ----------
+    // The planes on both kerbs meet in a green tunnel high over the track. On the left the walk under them: lantern lamps
+    // by the track, benches facing the water, West Lake's white balustrade and lotus, an old willow at the edge (or, on
+    // the city side, the river's steel railing and the far bank's lights); on the right the villa walls and their gates,
+    // villas on terraces up the wooded hill (or newer blocks, the towers of Qianjiang New City showing above the trees),
+    // a bus stop, bikes, a sightseeing cart waiting.
+    const avenueDecor = (toward) => {
+      const b = new Batcher(), city = toward === 'river';
+      lakeSide(b, city ? { willows: false, lotus: 0, modern: true, lamps: false } : { willows: false, lotus: 14, lamps: false });
+      if (city) K.farBank(b);
+      const L = [], R = [], gapsR = [];
+      for (let z = rand(1.5, 4.5); z < CHUNK_LEN; z += rand(8.6, 10.4)) { WT.wutong(b, -(EDGE + 2.9 + rand(-0.2, 0.2)), -z); L.push(z); }
+      for (let z = rand(5.5, 8.5); z < CHUNK_LEN; z += rand(8.6, 10.4)) { WT.wutong(b, EDGE + 2.9 + rand(-0.2, 0.2), -z); R.push(z); }
+      // the walk by the water
+      for (let z = rand(3, 7); z < CHUNK_LEN - 1; z += rand(17, 21)) if (free(L, z, 1.3)) { K.lampWL(b, -(EDGE + 0.9), -z); L.push(z); }
+      for (let k = randi(1, 3); k > 0; k--) { const z = slot(L, 1.6); if (z !== null) K.bench(b, -(EDGE + 5.6), -z, Math.PI / 2); }
+      if (!city) for (let k = randi(0, 2); k > 0; k--) { const z = slot(L, 2.4); if (z !== null) kit.willow(b, -(EDGE + 6.3), -z, rand(0.85, 1.0)); }
+      else if (chance(0.5)) { const z = slot(L, 1.4); if (z !== null) K.tideSign(b, -(EDGE + 6.6), -z, -1); }
+      K.strollers(b, -(EDGE + 0.5), -(EDGE + 5.0), 2, CHUNK_LEN - 2, randi(4, 8));
+      // the pavement: lamps, a bus stop, bikes, a newsstand, the cart, a street sign
+      for (let z = rand(12, 16); z < CHUNK_LEN - 1; z += rand(17, 21)) if (free(R, z, 1.3)) { K.lampWL(b, EDGE + 0.9, -z); R.push(z); }
+      if (chance(0.3)) { const z = slot(R, 2.4); if (z !== null) { K.busStop(b, EDGE + 5.0, -z, 1); gapsR.push([z - 2, z + 2]); } }
+      if (chance(0.3)) {
+        const n = randi(5, 8), z = slot(R, n * 0.36 + 1.4);
+        if (z !== null) { K.bikes(b, EDGE + 5.4, -z + n * 0.36, n, 1); gapsR.push([z - n * 0.36 - 1, z + n * 0.36 + 1]); }
+      }
+      if (chance(0.25)) { const z = slot(R, 2.3); if (z !== null) { K.newsstand(b, EDGE + 5.4, -z, 1); gapsR.push([z - 2, z + 2]); } }
+      if (!city && chance(0.35)) { const z = slot(R, 3.3); if (z !== null) K.tourCart(b, EDGE + 1.15, -z, 1); }
+      if (chance(0.5)) { const z = slot(R, 1.2); if (z !== null) K.signpost(b, EDGE + 1.3, -z, 1, SIGN[city ? '之江路' : pick(['北山街', '断桥 →'])]); }
+      if (chance(0.4)) { const z = slot(R, 1.0); if (z !== null) K.hydrant(b, EDGE + 1.0, -z); }
+      if (chance(0.35)) { const z = slot(R, 1.3); if (z !== null) K.bins(b, EDGE + 6.0, -z, 1); }
+      K.strollers(b, EDGE + 0.5, EDGE + 4.6, 2, CHUNK_LEN - 2, randi(4, 8), { gaps: gapsR });
+      // behind the wall
+      if (!city) {
+        K.villaWall(b, 1, 0, CHUNK_LEN);
+        for (let z = rand(2, 8); z < CHUNK_LEN - 8; z += rand(20, 28)) K.villa(b, 1, rand(19, 24), -(z + 6));
+        b.block(VC.solid, '#3e4a3c', 36, 0, -40, 14, 2.6, CHUNK_LEN);   // the wooded hill rising behind in terraces
+        b.block(VC.solid, '#36423a', 51, 0, -40, 16, 5.4, CHUNK_LEN);
+        for (let z = rand(1, 5); z < CHUNK_LEN; z += rand(7, 10)) kit.camphor(b, rand(31, 41), -z, rand(1.1, 1.4), { y: 2.6 });
+        for (let z = rand(1, 5); z < CHUNK_LEN; z += rand(8, 12)) kit.camphor(b, rand(45, 57), -z, rand(1.3, 1.7), { y: 5.4 });
+      } else {
+        K.villaWall(b, 1, 0, CHUNK_LEN, { gates: false, h: 1.5 });
+        for (let z = rand(0, 4); z < CHUNK_LEN - 6; ) {
+          const len = rand(14, 22), d = rand(10, 14), h = rand(12, 22);
+          b.addM(buildingGeo(d, h, len, K.officeTex, 1.6, 3.6), K.blockMat, at(14 + d / 2 + rand(0, 4), 0, -(z + len / 2)), pick(['#ffffff', '#e8f0ff', '#f0ece4']));
+          z += len + rand(3, 8);
+        }
+        K.cityRow(b, 1, { front: false, x0: 34 });
+      }
+      return K.flushSteam(b.build());
+    };
+
+    // ---------- the Qiantang at Qianjiang New City ----------
+    // The river on the left: its steel railing under a line of blue light, a tide warning, people at the railing, a
+    // cruise boat now and then, the far bank's towers playing the show and streaking the water with its colours. On the
+    // right the riverside park and its cycle lane, and behind it the towers of the new city, every one of them in the show.
+    const riverDecor = () => {
+      const b = new Batcher();
+      const L = lakeSide(b, { willows: false, lotus: 0, modern: true }), gl = [];
+      K.farBank(b);
+      if (chance(0.45)) K.cruise(b, -rand(40, 85), -rand(22, 58));
+      if (chance(0.4)) { const z = slot(L, 1.4); if (z !== null) K.tideSign(b, -(EDGE + 6.6), -z, -1); }
+      if (chance(0.35)) { const z = slot(L, 1.8); if (z !== null) { K.glowSeller(b, -(EDGE + 2.2), -z, -1); gl.push([z - 1.6, z + 1.6]); } }
+      K.spectators(b, -(EDGE + 2.6), -(EDGE + 6.6), 2, CHUNK_LEN - 2, randi(5, 10), -1, gl);
+      K.strollers(b, -(EDGE + 0.5), -(EDGE + 2.0), 2, CHUNK_LEN - 2, randi(2, 5), { gaps: gl });
+      K.riverPark(b, 1, 0, CHUNK_LEN);
+      K.cityRow(b, 1);
+      K.strollers(b, EDGE + 0.5, EDGE + 2.8, 2, CHUNK_LEN - 2, randi(4, 8));
+      return K.flushSteam(b.build());
+    };
+    const decor = (zone) => (zone === 'river' ? riverDecor() : zone === 'avenueL' ? avenueDecor('lake') : zone === 'avenueR' ? avenueDecor('river') : lakeDecor());
+
+    const LM = hzLandmarks(K, S, { lakeSide, kit });
+    const byKey = {
+      santan: { key: 'santan', name: '三潭映月', en: 'THREE POOLS MIRRORING THE MOON', build: santan },
+      qianjiang: { key: 'qianjiang', name: '钱江新城 · 金球与大剧院', en: 'QIANJIANG NEW CITY', build: qianjiang },
+      leifeng: { key: 'leifeng', name: '雷峰塔 · 断桥', en: 'LEIFENG PAGODA · BROKEN BRIDGE', build: leifengScene },
+    };
+    for (const l of LM.landmarks) byKey[l.key] = l;
+
     const sky = skyline({
       tex: skyTex({ wall: '#0e1a28', lit: ['#bfe3ff', '#ffd27a', '#ffffff'], chance: 0.3 }),
       colors: ['#c7d8ff', '#9db4d6'], count: 40, r: [640, 820], h: [60, 170], k: 1.6, gapAhead: 1.1,
@@ -398,6 +529,61 @@ export default {
       ],
     });
 
+    // ---------- the river's horizon, faded in while the run is by the Qiantang ----------
+    // Both banks' towers playing the show, the Gate of Hangzhou (two towers leaning together into a gate) across the river
+    // left of the track's end, the Olympic Center's "Big Lotus" further left, the Fuxing Bridge's lit arches across the
+    // river at the far end. Leifeng Pagoda (-22°) and Baochu Pagoda (14°) are left clear.
+    const rsMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, transparent: true, opacity: 0, depthWrite: false });
+    const riverSky = (() => {
+      const b = new Batcher();
+      const showFace = (x, z, ry, w, y0, y1, deg, r) => {   // a show screen on the face toward the camera
+        const a = -ry, wd = ((w / r) * 180) / Math.PI;
+        b.add(G.plane, S.sky, x - Math.sin(a) * 0.4, (y0 + y1) / 2, z + Math.cos(a) * 0.4, w * 0.94, y1 - y0, 1, 0, ry, 0, S.tint(((deg - wd / 2) / 30) * 80, rand(0.85, 1.1), (wd / 30) * 80));
+      };
+      const tower = (deg, r, w, h) => {
+        const [x, z, ry] = polar(deg, r), a = -ry, d = w * 0.8;
+        b.add(G.box, rsMat, x, (h - 95) / 2, z, w, h + 95, d, 0, ry, 0, '#141c28');
+        showFace(x - Math.sin(a) * d / 2, z + Math.cos(a) * d / 2, ry, w, 2, h - 4, deg, r);
+        b.add(G.box, rsMat, x, h + 1, z, w + 0.6, 2, d + 0.6, 0, ry, 0, hdr(pick(['#bfe8ff', '#ffffff', '#ffd27a']), 1.6));
+      };
+      for (const deg of [7, 10, 19, 23, 27, 31, 35, 39, 43, 47, 51]) tower(deg + rand(-1, 1), rand(400, 600), rand(22, 40), rand(90, 220));
+      for (const deg of [-74, -68, -62, -56, -50, -44, -27]) tower(deg + rand(-1, 1), rand(480, 650), rand(22, 36), rand(70, 170));
+      { // the Gate of Hangzhou: two towers of stacked blocks whose inner edges lean together as they rise
+        const deg = -13, r = 640, [gx, gz, gry] = polar(deg, r), ca = Math.cos(gry), sa = Math.sin(gry);
+        for (const e of [-1, 1]) for (let k = 0; k < 9; k++) {
+          const off = e * (30 - k * k * 0.22), y = -40 + k * 18 + 9, x = gx + ca * off, z = gz - sa * off;
+          b.add(G.box, rsMat, x, y, z, 20, 18, 16, 0, gry, 0, '#18202c');
+          b.add(G.box, rsMat, x, y + 8.6, z, 20.3, 0.8, 16.3, 0, gry, 0, hdr('#ffe2b0', 1.3));
+          if (k > 1) showFace(x - Math.sin(-gry) * 8, z + Math.cos(-gry) * 8, gry, 20, y - 8.5, y + 8, deg + (off / r) * (180 / Math.PI), r);
+        }
+      }
+      { // the Big Lotus: the stadium's ring of white petals, lit warm
+        const [cx, cz] = polar(-34, 470);
+        for (let k = 0; k < 28; k++) {
+          const a = (k / 28) * Math.PI * 2;
+          b.add(G.cone8, rsMat, cx + Math.cos(a) * 44, 12, cz + Math.sin(a) * 44, 14, 60, 5, 0.45, Math.PI / 2 - a, 0, hdr(k % 2 ? '#f4f0ff' : '#fff0dc', 1.25));
+        }
+        b.add(G.cyl, rsMat, cx, -20, cz, 96, 30, 96, 0, 0, 0, '#1a1e28');
+      }
+      { // the Fuxing Bridge across the river: two decks on their piers, lit arches springing over them
+        const [x1, z1] = polar(-40, 430), [x2, z2] = polar(4, 360), dx = x2 - x1, dz = z2 - z1, L = Math.hypot(dx, dz), ry = Math.atan2(dx, dz);
+        const P = (t) => [x1 + dx * t, z1 + dz * t];
+        for (const y of [8, 14]) { b.add(G.box, rsMat, x1 + dx / 2, y, z1 + dz / 2, 3, 2.4, L, 0, ry, 0, '#1a1e26'); b.add(G.box, rsMat, x1 + dx / 2, y + 1.3, z1 + dz / 2, 3.2, 0.5, L, 0, ry, 0, hdr('#bfe0ff', 1.8)); }
+        for (let k = 0; k <= 6; k++) { const [px, pz] = P(k / 6); b.add(G.box, rsMat, px, -30, pz, 6, 76, 6, 0, ry, 0, '#141820'); }
+        for (let k = 0; k < 6; k++) for (let j = 0; j < 12; j++) {
+          const [ax, az] = P((k + j / 12) / 6), [bx, bz] = P((k + (j + 1) / 12) / 6);
+          const y0 = 14 + Math.sin((Math.PI * j) / 12) * 22, y1 = 14 + Math.sin((Math.PI * (j + 1)) / 12) * 22, hz = Math.hypot(bx - ax, bz - az);
+          b.add(G.box, rsMat, (ax + bx) / 2, (y0 + y1) / 2, (az + bz) / 2, 1.6, 1.6, Math.hypot(hz, y1 - y0), -Math.atan2(y1 - y0, hz), ry, 0, hdr('#9ad8ff', 1.5));
+        }
+      }
+      const g = b.build();
+      g.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.renderOrder = -4; } });
+      g.visible = false;
+      return g;
+    })();
+    sky.add(riverSky);
+    let riverK = 0;
+
     const trainStyle = {
       body: '#eef1f5', bodyMetal: true, roof: '#d4d9e0', under: '#2a2f38', stripe: RED, stripe2: '#c9a227', nose: 'bullet',
       window: '#d6ecff', windowK: 1.7, frame: '#1d2a3a', light: '#e8f4ff', sign: RED, doors: true, door: '#c8ced8', roofUnit: '#aab2bf',
@@ -407,13 +593,18 @@ export default {
 
     return {
       track, decor, skyline: sky, trainStyle, barrier,
+      zoneAt: (k) => (k < 0 ? 'lake' : ZONES[k % ZONES.length]),
+      zonePool: { lake: [4, 6], avenueL: [2, 3], avenueR: [2, 3], river: [5, 8] },
       coinGeo: coinGeometry('cash'), coinMat: coinMaterial('#ffcf4a', '#ff9a1a'),
-      landmarks: [
-        { name: '三潭映月', en: 'THREE POOLS MIRRORING THE MOON', build: santan },
-        { name: '钱江新城 · 金球与大剧院', en: 'QIANJIANG NEW CITY', build: qianjiang },
-        { name: '雷峰塔 · 断桥', en: 'LEIFENG PAGODA · BROKEN BRIDGE', build: leifengScene },
-      ],
-      update(t) { water.userData.scroll.offset.set(t * 0.008, t * 0.02); ledScreen.uniforms.time.value = t; },
+      landmarks: ROUTE.map((k) => byKey[k]),
+      update(t) {
+        water.userData.scroll.offset.set(t * 0.008, t * 0.02); ledScreen.uniforms.time.value = t;
+        S.update(t); K.update(t); LM.update(t);
+        // where the camera is on the loop: the river's horizon comes up through the avenue and goes again on the way back
+        const n = ZONES.length, p = ((((-sky.position.z) / CHUNK_LEN) % n) + n) % n;
+        const k = smooth(clamp((p - 6.2) / 1.6, 0, 1)) * (1 - smooth(clamp((p - 18.2) / 1.6, 0, 1)));
+        if (k !== riverK) { riverK = k; rsMat.opacity = k; S.sky.uniforms.fade.value = k; riverSky.visible = k > 0.003; }
+      },
     };
   },
 };

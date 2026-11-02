@@ -124,7 +124,7 @@ export const ui = {
       const d = c.cards[k];
       const b = document.createElement("button");
       const shown = i >= 0 && i < c.per;
-      b.className = "city" + (d.id === c.selected ? " on" : "");
+      b.className = "city" + (d.id === c.selected ? " on" : "") + (d.name.length > 3 ? " long" : d.name.length === 3 ? " mid" : "");
       if (shown) b.id = "city-" + d.id;
       else b.tabIndex = -1;
       b.style.setProperty("--grad", d.grad);

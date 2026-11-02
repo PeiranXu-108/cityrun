@@ -1,10 +1,11 @@
 // Beijing landmark scenes: Qianmen Street & Zhengyangmen, Tian'anmen on Chang'an Avenue, the Forbidden City corner
-// tower over its moat, the Temple of Heaven, Shichahai with the Drum & Bell Towers, the Bird's Nest & Water Cube, the CBD.
-import { THREE, Batcher, VC, G, std, basic, hdr, canvasTex, buildingGeo, rand, randi, pick } from '../core.js';
+// tower over its moat, the Temple of Heaven, Shichahai with the Yinding Bridge and the Drum & Bell Towers, the Bird's
+// Nest & Water Cube, the CBD. (More sights in beijing_sights.js.)
+import { THREE, Batcher, VC, G, std, basic, hdr, canvasTex, buildingGeo, planeUV, rand, randi, pick } from '../core.js';
 import { at, EDGE, farGround, textTex, waterMat } from './common.js';
 import { beam } from './tokyo_kit.js';
 import { treeKit } from './trees.js';
-import { VERM, MARBLE, CN_SIGN, tiledBox } from './beijing_kit.js';
+import { VERM, MARBLE, CN, CN_SIGN, tiledBox } from './beijing_kit.js';
 
 const smooth01 = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
@@ -400,20 +401,77 @@ export function bjLandmarks(K) {
     K.roof(b, K.greenTile, x, 21.6, z, 8.6, 8.6, 3.6, { eave: 1.2, lift: 0.6 });
     for (const dz of [-5, 5]) b.box(VC.glow, hdr('#ffd28a', 2.0), x + 9, 0.2, z + dz, 0.6, 0.3, 0.6);
   };
+  // 银锭桥: the little humped marble bridge of one arch over the neck between Qianhai and Houhai, from x0 to x1 at z
+  const yinding = (b, x0, x1, z, yw) => {
+    const L = x1 - x0, W = 5, R = 2.2, cx = (x0 + x1) / 2;
+    const deck = (x) => { const u = ((x - x0) / L) * 2 - 1; return 0.6 + 2.6 * (1 - u * u); };
+    const sh = new THREE.Shape(), bottom = -1.0, h = new THREE.Path();
+    sh.moveTo(0, bottom); sh.lineTo(L, bottom);
+    for (let i = 24; i >= 0; i--) sh.lineTo((L * i) / 24, deck(x0 + (L * i) / 24));
+    h.moveTo(L / 2 - R, bottom + 0.3); h.lineTo(L / 2 + R, bottom + 0.3); h.lineTo(L / 2 + R, 0.2); h.absarc(L / 2, 0.2, R, 0, Math.PI, false); h.lineTo(L / 2 - R, bottom + 0.3);
+    sh.holes.push(h);
+    const g = new THREE.ExtrudeGeometry(sh, { depth: W, bevelEnabled: false, curveSegments: 12 }), uv = g.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 2, uv.getY(i) / 2);
+    b.addM(g, K.marbleMat, at(x0, yw, z - W / 2), 0xffffff);
+    b.add(new THREE.TorusGeometry(R, 0.06, 3, 16, Math.PI), VC.glow, cx, yw + 0.2, z + W / 2 + 0.03, 1, 1, 1, 0, 0, 0, hdr('#ffc26a', 1.6));
+    for (const s of [-1, 1]) b.box(VC.glow, hdr('#ffc26a', 1.6), cx + s * R, yw + 0.1, z + W / 2 + 0.03, 0.12, 0.2, 0.05);
+    b.add(G.plane, reflWarm, cx, -0.77, z + W / 2 + 6, 3.4, 12, 1, -Math.PI / 2, 0, 0);
+    for (const zz of [z + W / 2 - 0.15, z - W / 2 + 0.15]) {   // humped balustrades
+      let prev = null;
+      for (let i = 0; i <= 12; i++) {
+        const x = x0 + (L * i) / 12, y = yw + deck(x);
+        b.box(VC.solid, MARBLE, x, y + 0.45, zz, 0.2, 0.9, 0.2);
+        b.sph(VC.solid, MARBLE, x, y + 0.95, zz, 0.12, true);
+        if (prev) beam(b, VC.solid, prev[0], prev[1] + 0.75, zz, x, y + 0.75, zz, 0.12, MARBLE, 0.16);
+        prev = [x, y];
+      }
+    }
+    for (const x of [x0 + 0.4, x1 - 0.4]) for (const zz of [z + W / 2 + 0.3, z - W / 2 - 0.3]) {   // lamp posts at its ends
+      b.cyl(VC.metal, '#2a2a2e', x, 1.6, zz, 0.07, 3.2, 'cyl8');
+      K.lantern(b, x, 3.4, zz, 0.55);
+    }
+    b.box(VC.solid, '#8a8680', x0 - 1.4, 0.3, z + W / 2 + 1.6, 0.6, 0.6, 1.8);
+    b.add(G.box, yindingMat, x0 - 1.4, 1.15, z + W / 2 + 1.6, 0.22, 1.1, 2.0);
+  };
+  const yindingMat = (() => { const t = textTex('银锭桥', { w: 512, h: 256, color: '#a81c1c', bg: '#c8c2b6', font: CN, weight: 400, size: 0.6 }); return std({ map: t, emissiveMap: t, emissive: '#ffffff', emissiveIntensity: 0.45, roughness: 0.9 }); })();
   const shichahai = () => {
     const b = new Batcher();
     farGround(b, -1, '#18181e');
-    // lakeside promenade: willows, lantern strings, railing
+    // the Lotus Market archway over the way in; the lakeside promenade: willows, lantern strings, railing
+    K.pailou(b, -3, { text: '荷花市场', roof: K.greenTile });
     b.box(VC.solid, '#3a3a40', 7, 0.03, -40, 6.5, 0.03, 80);
-    for (let z = 3; z < 80; z += 9) T.willow(b, 8.6, -z, rand(0.95, 1.15), { ry: Math.PI + rand(-0.4, 0.4) });
+    for (const z of [12, 21]) T.willow(b, 8.6, -z, rand(0.95, 1.15), { ry: Math.PI + rand(-0.4, 0.4) });
     K.lanternRun(b, 10.0, 3.4, 0, 80);
-    b.box(VC.solid, '#7a7670', 10.6, 0.45, -40, 0.25, 0.9, 80);
-    // the lake, its boats, the bar street on the far shore with its lights running across the water
-    b.box(VC.solid, '#0e1020', 46, -1.8, -40, 72, 0.2, 80);
-    b.add(G.plane, lake, 46, -0.8, -40, 71, 80, 1, -Math.PI / 2, 0, 0);
+    b.box(VC.solid, '#7a7670', 10.6, 0.45, -31, 0.25, 0.9, 62);
+    b.box(VC.solid, '#7a7670', 10.6, 0.45, -78, 0.25, 0.9, 4);
+    // Qianhai with its boats; it narrows to the neck under the Yinding Bridge, bars along the far and the north shores
+    // throw their lights across the water
+    b.box(VC.solid, '#0e1020', 46, -1.8, -29, 72, 0.2, 58);
+    b.add(G.plane, lake, 46, -0.8, -29, 71, 58, 1, -Math.PI / 2, 0, 0);
+    b.box(VC.solid, '#0e1020', 17.3, -1.8, -69, 13.6, 0.2, 22);
+    b.add(G.plane, lake, 17.3, -0.8, -69, 13.6, 22, 1, -Math.PI / 2, 0, 0);
     b.box(VC.solid, '#4a4844', 11.0, -0.8, -40, 0.8, 2.0, 80);
-    for (let k = 0; k < 5; k++) boat(b, rand(22, 56), -rand(6, 74), rand(-0.5, 0.5));
-    for (let z = 2; z < 78; z += rand(7.5, 10)) {
+    b.box(VC.solid, '#4a4844', 53, -0.85, -58.4, 58, 1.9, 0.8);
+    b.box(VC.solid, '#4a4844', 24.4, -0.85, -69.2, 0.8, 1.9, 21.6);
+    b.box(VC.solid, '#202024', 53, -0.1, -69.2, 58, 0.2, 21.6);
+    yinding(b, 10.6, 24.0, -68, -0.8);
+    for (let k = 0; k < 5; k++) boat(b, rand(22, 56), -rand(6, 50), rand(-0.5, 0.5));
+    for (let x = 27; x < 78; x += rand(7.5, 9.5)) {   // the north shore, its fronts toward the runner
+      const len = rand(5.5, 7.5), xc = x + len / 2, h = rand(5, 7), zf = -59.4, i = randi(0, 11);
+      K.brick(b, xc, 0, zf - 4, len - 0.3, h, 8, '#d8cfc4');
+      K.roof(b, K.tileGrey, xc, h, zf - 4, len, 8, 1.6, { hip: false, eave: 0.6, gable: K.brickMat });
+      b.box(VC.glow, hdr(pick(['#ffcf8a', '#ff9ad5', '#7cf8ff']), 0.8), xc, 1.8, zf + 0.03, len - 1.4, 2.6, 0.05);
+      b.add(planeUV(K.neonRects[i]), K.neonMat, xc, h - 1.3, zf + 0.1, Math.min(4.2, len - 1), Math.min(4.2, len - 1) / 4, 1);
+      for (const dx of [-len / 3, len / 3]) K.lantern(b, xc + dx, h - 0.3, zf + 0.5, 0.6);
+      b.add(G.plane, reflNeon[i % reflNeon.length], xc, -0.76, zf + 13, 2.2, 24, 1, -Math.PI / 2, 0, 0);
+    }
+    for (const z of [-63, -71, -78]) {   // houses along the neck's far bank
+      K.brick(b, 29, 0, z, 8, 5.2, 6.4, '#d8cfc4');
+      K.roof(b, K.tileGrey, 29, 5.2, z, 6.8, 8, 1.6, { hip: false, ry: Math.PI / 2, eave: 0.5, gable: K.brickMat });
+      b.box(VC.glow, hdr('#ffcf8a', 0.8), 24.97, 1.8, z, 0.05, 2.6, 4.6);
+      K.lantern(b, 24.6, 4.4, z, 0.6);
+    }
+    for (let z = 2; z < 50; z += rand(7.5, 10)) {
       const len = rand(5.5, 7.5), zc = -(z + len / 2), h = rand(5, 7);
       K.brick(b, 84, 0, zc, 8, h, len - 0.3, '#d8cfc4');
       K.roof(b, K.tileGrey, 84, h, zc, len, 8, 1.6, { hip: false, ry: Math.PI / 2, eave: 0.6, gable: K.brickMat });
@@ -571,13 +629,13 @@ export function bjLandmarks(K) {
 
   return {
     landmarks: [
-      { name: '前门大街 · 正阳门', en: 'QIANMEN STREET · ZHENGYANGMEN', build: qianmen },
-      { name: '天安门 · 长安街', en: "TIAN'ANMEN · CHANG'AN AVENUE", build: tiananmen },
-      { name: '故宫角楼 · 筒子河', en: 'FORBIDDEN CITY CORNER TOWER', build: jiaolou },
-      { name: '天坛 · 祈年殿', en: 'TEMPLE OF HEAVEN', build: tiantan },
-      { name: '什刹海 · 鼓楼', en: 'SHICHAHAI · DRUM TOWER', build: shichahai },
-      { name: '鸟巢 · 水立方', en: "BIRD'S NEST · WATER CUBE", build: olympic },
-      { name: 'CBD · 中国尊', en: 'CBD · CITIC TOWER', build: cbd },
+      { key: 'qianmen', name: '前门大街 · 正阳门', en: 'QIANMEN STREET · ZHENGYANGMEN', build: qianmen },
+      { key: 'tiananmen', name: '天安门 · 长安街', en: "TIAN'ANMEN · CHANG'AN AVENUE", build: tiananmen },
+      { key: 'jiaolou', name: '故宫角楼 · 筒子河', en: 'FORBIDDEN CITY CORNER TOWER', build: jiaolou },
+      { key: 'tiantan', name: '天坛 · 祈年殿', en: 'TEMPLE OF HEAVEN', build: tiantan },
+      { key: 'shichahai', name: '什刹海 · 银锭桥', en: 'SHICHAHAI · YINDING BRIDGE', build: shichahai },
+      { key: 'olympic', name: '鸟巢 · 水立方', en: "BIRD'S NEST · WATER CUBE", build: olympic },
+      { key: 'cbd', name: 'CBD · 中国尊', en: 'CBD · CITIC TOWER', build: cbd },
     ],
     update(t) {
       moat.userData.scroll.offset.set(t * 0.006, t * 0.016);

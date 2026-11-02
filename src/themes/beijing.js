@@ -5,10 +5,15 @@
 import { THREE, Batcher, VC, G, std, hdr, stripeTex, canvasTex, CHUNK_LEN, rand, randi, pick, chance } from '../core.js';
 import { barrierStyle, coinGeometry, coinMaterial } from '../props.js';
 import { makeTrack, skyline, skyTex, SKY_VC, polar, at, EDGE, farGround, textTex } from './common.js';
-import { makeKit, GLYPHS, CN_SIGN } from './beijing_kit.js';
+import { makeKit, GLYPHS as KIT_GLYPHS, CN_SIGN, roofGeo } from './beijing_kit.js';
 import { bjLandmarks } from './beijing_landmarks.js';
+import { bjSights, SIGHT_GLYPHS } from './beijing_sights.js';
 
-export { GLYPHS };
+export const GLYPHS = [...new Set(KIT_GLYPHS + SIGHT_GLYPHS)].join('');
+
+// the landmark scenes in the order the run meets them: round the centre, out to the Summer Palace in the north-west,
+// back by the Olympic Green and the north-east, the CBD, Wangfujing, and south to the Temple of Heaven
+const ROUTE = ['qianmen', 'dahuitang', 'tiananmen', 'jiaolou', 'shichahai', 'yiheyuan', 'yuanmingyuan', 'olympic', 'yonghegong', 'art798', 'cbd', 'wangfujing', 'tiantan'];
 
 // ---------- the Yanshan ridges and the Great Wall, centred on the far end of the track ----------
 const gauss = (a, c, w, h) => h * Math.exp(-(((a - c) / w) ** 2));
@@ -74,16 +79,79 @@ function greatWall(b) {
   }
 }
 
-// skyline buildings stay under the wall in front of the mountains
+// skyline buildings stay under the wall in front of the mountains, and leave the sky clear behind Longevity Hill
 const wallClear = (a, rr) => {
   const deg = (a * 180) / Math.PI;
+  if (deg > -52 && deg < -20) return 18;
   return Math.abs(deg) < 36 ? EYE + rr * Math.tan(((WALL_RIDGE(deg) - 0.9) * Math.PI) / 180) : Infinity;
 };
 
+// ---------- Longevity Hill across Kunming Lake ----------
+// The dark wooded hill, the Long Corridor's lamps along its foot, the Paiyun halls climbing its axis and the Tower of
+// Buddhist Incense floodlit gold on its great stone terrace. Modelled facing +z (toward the runner); it stands on the
+// skyline only while the Summer Palace is near (beijing update fades its material in and out).
+const HILL = { A: 84, H: 82, D: 66, Y0: -32 };
+const hillY = (x, z) => HILL.Y0 + HILL.H * Math.sqrt(Math.max(0, 1 - (x / HILL.A) ** 2 - (z / HILL.D) ** 2));
+function longevityHill(mat) {
+  const b = new Batcher(), I = new THREE.Matrix4();
+  const g = new THREE.SphereGeometry(1, 48, 16, 0, Math.PI * 2, 0, Math.PI / 2), p = g.attributes.position;
+  const col = new Float32Array(p.count * 3), c = new THREE.Color(), lo = new THREE.Color('#10182a'), hi = new THREE.Color('#283452');
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), bump = 1 + 0.05 * Math.sin(x * 9 + z * 5) + 0.035 * Math.sin(x * 23 - z * 17);
+    p.setXYZ(i, x * HILL.A, HILL.Y0 + y * HILL.H * bump, z * HILL.D);
+    c.copy(lo).lerp(hi, y * y).multiplyScalar(0.9 + 0.2 * Math.random());
+    col.set([c.r, c.g, c.b], i * 3);
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  b.addM(g, mat, I, null);
+  const box = (x, y, z, w, h, d, color) => b.add(G.box, mat, x, y + h / 2, z, w, h, d, 0, 0, 0, color);
+  const face = (x, y, z, w, h, color) => b.add(G.plane, mat, x, y + h / 2, z, w, h, 1, 0, 0, 0, color);
+  const roof = (y, z, w, d, h, color) => b.addM(roofGeo(w, d, h, { lift: 0.55, eave: 1.0 }).roof, mat, new THREE.Matrix4().makeTranslation(0, y, z), color);
+  const gold = hdr('#e8b848', 0.95), lit = hdr('#ffb256', 1.1), stone = hdr('#9a7254', 0.62), wall = hdr('#b8442a', 0.75);
+  // the great terrace, its stair up the middle, and the tower on it: three storeys under four tiers of eaves
+  const TZ = 44;
+  box(0, 18, TZ, 30, 22, 16, hdr('#3e3028', 0.8));
+  face(0, 18, TZ + 8.05, 30, 22, hdr('#6a5040', 0.55));
+  face(0, 18, TZ + 8.1, 4, 22, hdr('#d89868', 0.62));
+  for (let k = 0; k < 4; k++) face(-10.5 + k * 7, 30, TZ + 8.12, 1.4, 2.2, hdr('#ffc070', 1.1));
+  box(0, 40, TZ + 7.6, 30, 1.0, 0.8, hdr('#a88a68', 0.8));
+  const oct = (r, h, y, color) => b.add(G.cyl8, mat, 0, y + h / 2, TZ, r * 2, h, r * 2, 0, 0, 0, color);
+  const skirt = (r0, r1, h, y) => {
+    b.addM(new THREE.LatheGeometry([new THREE.Vector2(r0 + 0.8, 0.5), new THREE.Vector2(r0, 0), new THREE.Vector2(r0 - (r0 - r1) * 0.55, h * 0.4), new THREE.Vector2(r1, h)], 8), mat, new THREE.Matrix4().makeTranslation(0, y, TZ), gold);
+    b.add(G.cyl8, mat, 0, y + 0.1, TZ, (r0 + 0.8) * 2, 0.5, (r0 + 0.8) * 2, 0, 0, 0, hdr('#3a8a5a', 0.9));
+  };
+  oct(13, 2, 41.2, stone);
+  oct(9.5, 8, 43.2, lit); skirt(13.5, 9.0, 3.0, 51.2);
+  oct(8.4, 2.4, 53.6, wall); skirt(12.0, 7.8, 2.6, 55.8);
+  oct(7.2, 5.6, 58.2, lit); skirt(10.2, 6.2, 2.4, 63.6);
+  oct(5.6, 4.6, 65.8, lit); skirt(8.6, 0.3, 7.6, 70.2);
+  b.add(G.sph, mat, 0, 78.4, TZ, 1.8, 2.2, 1.8, 0, 0, 0, hdr('#ffd870', 1.8));
+  // Hall of Virtuous Light, Hall of Dispelling Clouds, Paiyun Gate, the archway on the shore
+  for (const [z, w, d, h, y] of [[54, 16, 8, 6, 15], [59, 22, 10, 7.5, 5.5], [63.5, 18, 5, 5, 0]]) {
+    if (y > 0) { box(0, -2, z, w + 6, y + 2, d + 4, hdr('#6a5040', 0.6)); face(0, 0, z + d / 2 + 2.05, w + 6, y, stone); }
+    box(0, y, z, w, h, d, wall);
+    face(0, y + 0.6, z + d / 2 + 0.05, w - 1.4, h * 0.65, lit);
+    roof(y + h, z, w + 1, d + 1, h * 0.55, gold);
+  }
+  for (const x of [-5, -1.8, 1.8, 5]) box(x, 0, 67, 0.7, 7, 0.7, wall);
+  box(0, 6.5, 67, 12, 1.2, 1.0, hdr('#3a7a8a', 0.9));
+  roof(7.7, 67, 12, 1.6, 1.6, gold);
+  // the Long Corridor along the shore: lamplight between its columns, a red lantern every bay
+  box(0, 0, 64.5, 150, 3.4, 3.2, hdr('#2a2228', 1));
+  face(0, 0.5, 66.15, 150, 2.2, hdr('#ffb060', 1.05));
+  box(0, 3.4, 64.5, 152, 0.7, 4.4, hdr('#2c3a38', 1));
+  for (let x = -72; x <= 72; x += 6) box(x, 2.3, 66.4, 0.5, 0.6, 0.5, hdr('#ff3a24', 2.2));
+  // the Sea of Wisdom on the crown, glazed green and gold, barely lit
+  box(0, hillY(0, 8) - 2, 8, 14, 9, 8, hdr('#4a6a5a', 0.7));
+  roof(hillY(0, 8) + 7, 8, 15, 9, 3.4, hdr('#8a7a3a', 0.8));
+  return b.build();
+}
+
 export default {
   id: 'bj', name: '北京', en: 'BEIJING', tagline: '金秋月夜 · 千年古都',
-  blurb: '中秋满月下的北京：胡同里柿子挂满枝头，红墙下银杏金黄，长安街华灯初上。穿过前门五牌楼、天安门、故宫角楼和天坛，经过什刹海的酒吧灯影与鼓楼，再到鸟巢、水立方和 CBD 的中国尊；跑道尽头，长城在燕山山脊上亮起灯火。',
-  sights: ['前门大街', '天安门', '故宫角楼', '天坛祈年殿', '什刹海 · 鼓楼', '鸟巢 · 水立方', 'CBD · 中国尊'],
+  blurb: '中秋满月下的北京：胡同里柿子挂满枝头，红墙下银杏金黄，长安街华灯初上。从前门五牌楼出发，经过人民大会堂和湖中的国家大剧院、天安门、故宫角楼，到什刹海的银锭桥和酒吧灯影；再去颐和园，十七孔桥倒映在昆明湖里，对岸佛香阁一片金黄；然后是月光下的圆明园大水法、鸟巢水立方、香火缭绕的雍和宫、798 艺术区、CBD 的中国尊、王府井的东堂，最后到天坛；跑道尽头，长城在燕山山脊上亮起灯火。',
+  sights: ['前门大街', '人民大会堂 · 国家大剧院', '天安门', '故宫角楼', '什刹海 · 银锭桥', '颐和园 · 十七孔桥', '圆明园 · 大水法', '鸟巢 · 水立方', '雍和宫', '798 艺术区', 'CBD · 中国尊', '王府井 · 东堂', '天坛祈年殿'],
   accent: '#e8382f', accent2: '#ffd166', portal: '#ffb020',
   sky: { top: '#040a22', mid: '#172c64', bot: '#c87a48', glow: '#ff9a4a', glowK: 0.38, sun: '#ffc860', sunK: 0.8,
     sunDir: [-0.13, 0.21, -1], sunSize: 0.0011, moon: true, cloud: 0.22, cloudColor: '#3a4a7a', horizon: -0.07, stars: true },
@@ -149,7 +217,8 @@ export default {
       return b.build();
     };
 
-    const LM = bjLandmarks(K);
+    const LM = bjLandmarks(K), SG = bjSights(K);
+    const byKey = Object.fromEntries([...LM.landmarks, ...SG.landmarks].map((l) => [l.key, l]));
 
     const sky = skyline({
       tex: skyTex({ wall: '#0b0d1e', lit: ['#fff1d6', '#d6ecff', '#ffd9a8', '#ffe2b0'], chance: 0.32 }),
@@ -163,7 +232,7 @@ export default {
           greatWall(b);
         },
         (b) => {   // Central Radio & TV Tower in the west
-          const [x, z] = polar(-27, 720);
+          const [x, z] = polar(-19, 720);
           b.addM(new THREE.CylinderGeometry(5, 13, 260, 12, 1).translate(0, 130 - 95, 0), SKY_VC, at(x, 0, z), '#8a92aa');
           b.add(G.cyl, SKY_VC, x, 112, z, 34, 22, 34, 0, 0, 0, '#3a4060');
           for (const y of [104, 118]) b.add(G.cyl, SKY_VC, x, y, z, 35, 2, 35, 0, 0, 0, hdr('#cfe6ff', 2.0));
@@ -195,6 +264,15 @@ export default {
         },
       ],
     });
+    // Longevity Hill rises across Kunming Lake, left of the street's end, while the Summer Palace is near
+    const hillMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, transparent: true, opacity: 0, side: THREE.DoubleSide });
+    const hill = longevityHill(hillMat);
+    { const [x, z, ry] = polar(-36, 380); hill.position.set(x, 0, z); hill.rotation.y = ry; }
+    hill.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.renderOrder = -4; } });
+    hill.visible = false;
+    sky.add(hill);
+    const summer = byKey.yiheyuan;
+    let hillK = 0;
 
     // Beijing subway trains (white with the red stripe) parked; old green-skin passenger trains come at you
     const trainStyle = {
@@ -229,9 +307,15 @@ export default {
 
     return {
       track, decor, skyline: sky, trainStyle, barrier,
-      landmarks: LM.landmarks,
+      landmarks: ROUTE.map((k) => byKey[k]),
       coinGeo: coinGeometry('ingot'), coinMat: coinMaterial('#ffd04a', '#ffa000'),
-      update(t) { K.update(t); LM.update(t); },
+      update(t) {
+        K.update(t); LM.update(t); SG.update(t);
+        // fade Longevity Hill in as the Summer Palace comes up, out again once its lake is behind
+        const ch = summer.obj && summer.obj.parent, D = ch && ch.parent ? sky.position.z - ch.position.z : 1e9;
+        const k = D > 250 ? 0 : D > 170 ? (250 - D) / 80 : D > -60 ? 1 : D > -100 ? (D + 100) / 40 : 0;
+        if (k !== hillK) { hillK = k; hillMat.opacity = k; hill.visible = k > 0.005; }
+      },
     };
   },
 };

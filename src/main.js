@@ -38,8 +38,13 @@ import {
 import { World, THEMES, THEME_ORDER } from "./world.js";
 import { GLYPHS } from "./themes/tokyo.js";
 import { GLYPHS as BJ_GLYPHS } from "./themes/beijing.js";
+import { GLYPHS as HZ_GLYPHS } from "./themes/hz.js";
 import { GLYPHS as HK_GLYPHS } from "./themes/hongkong_kit.js";
 import { GLYPHS as TP_GLYPHS } from "./themes/taipei_kit.js";
+import { GLYPHS as IST_GLYPHS } from "./themes/istanbul_kit.js";
+import { GLYPHS as MSK_GLYPHS } from "./themes/moscow_kit.js";
+import { GLYPHS as SF_GLYPHS } from "./themes/sf_kit.js";
+import { GLYPHS as LA_GLYPHS } from "./themes/la_kit.js";
 import { POWERUPS } from "./props.js";
 import { Run } from "./game.js";
 import { audio } from "./audio.js";
@@ -864,6 +869,17 @@ async function boot() {
     fonts.push(document.fonts.load('40px "Dela Gothic One"', GLYPHS));
     for (const f of ["Ma Shan Zheng", "ZCOOL QingKe HuangYou"])
       fonts.push(document.fonts.load(`40px "${f}"`, BJ_GLYPHS));
+    // Hangzhou's: the brush and display faces for the old streets and the light show, Noto Sans SC (a subset holding just
+    // the glyphs drawn) for the newsstands, bike docks, street signs and the riverside
+    for (const f of ["Ma Shan Zheng", "ZCOOL QingKe HuangYou"])
+      fonts.push(document.fonts.load(`40px "${f}"`, HZ_GLYPHS));
+    const hzText = [...new Set(HZ_GLYPHS + "→·")].join("");
+    const hzCss = document.createElement("link");
+    hzCss.rel = "stylesheet";
+    hzCss.href = `https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@900&text=${encodeURIComponent(hzText)}&display=swap`;
+    const hzReady = new Promise((r) => { hzCss.onload = hzCss.onerror = r; });
+    document.head.appendChild(hzCss);
+    fonts.push(hzReady.then(() => document.fonts.load('900 40px "Noto Sans SC"', hzText)));
     // Hong Kong's signs: traditional characters in Hong Kong's own Chiron faces (Ming for the boards, Hei for the rest)
     // and a kaishu, fetched as a subset holding just the glyphs the signs draw
     const hkText = [...new Set(HK_GLYPHS + "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 &'·%.É▲▼")].join("");
@@ -882,6 +898,46 @@ async function boot() {
     const tpReady = new Promise((r) => { tpCss.onload = tpCss.onerror = r; });
     document.head.appendChild(tpCss);
     fonts.push(tpReady.then(() => Promise.all(['900 40px "Noto Sans TC"', '700 40px "Noto Sans TC"', '900 40px "Noto Serif TC"', '400 40px "Huninn"', '400 40px "Iansui"'].map((f) => document.fonts.load(f, tpText)))));
+    // Istanbul's signs: the Turkish letters come from the fonts' latin-ext subsets; Playfair Display for the old trades' boards
+    const trText = IST_GLYPHS + "ABCDEFGHIJKLMNOPQRSTUVWXYZ·—";
+    const istCss = document.createElement("link");
+    istCss.rel = "stylesheet";
+    istCss.href = "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&display=swap";
+    const istReady = new Promise((r) => { istCss.onload = istCss.onerror = r; });
+    document.head.appendChild(istCss);
+    fonts.push(istReady.then(() => Promise.all(['900 40px "Playfair Display"', '700 40px "Playfair Display"'].map((f) => document.fonts.load(f, trText)))));
+    for (const f of ['400 40px "Russo One"', '700 40px "Chakra Petch"', '600 40px "Chakra Petch"']) fonts.push(document.fonts.load(f, trText));
+    // Moscow's signs, in Cyrillic: Oswald for the shop boards, Yeseva One for the old trades, Ruslan Display's Old Russian
+    // letters for the souvenir stalls; Russo One and Playfair Display bring their own cyrillic subsets
+    const ruText = MSK_GLYPHS + "0123456789 !.,·";
+    const mskCss = document.createElement("link");
+    mskCss.rel = "stylesheet";
+    mskCss.href = "https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Yeseva+One&family=Ruslan+Display&display=swap";
+    const mskReady = new Promise((r) => { mskCss.onload = mskCss.onerror = r; });
+    document.head.appendChild(mskCss);
+    fonts.push(mskReady.then(() => Promise.all(['500 40px "Oswald"', '700 40px "Oswald"', '400 40px "Yeseva One"', '400 40px "Ruslan Display"', '400 40px "Russo One"', '900 40px "Playfair Display"'].map((f) => document.fonts.load(f, ruText)))));
+    // San Francisco's: Rye's painted boards for the wharf and the old shops, Righteous for the Haight, Monoton's neon tubes
+    // for the Castro, besides the Oswald and Playfair Display loaded above; the Mission's Spanish letters are in all of them
+    const sfText = SF_GLYPHS + "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 &·";
+    const sfCss = document.createElement("link");
+    sfCss.rel = "stylesheet";
+    sfCss.href = "https://fonts.googleapis.com/css2?family=Rye&family=Righteous&family=Monoton&display=swap";
+    const sfReady = new Promise((r) => { sfCss.onload = sfCss.onerror = r; });
+    document.head.appendChild(sfCss);
+    fonts.push(sfReady.then(() => Promise.all(['400 40px "Rye"', '400 40px "Righteous"', '400 40px "Monoton"'].map((f) => document.fonts.load(f, sfText)))));
+    fonts.push(mskReady.then(() => Promise.all(['500 40px "Oswald"', '700 40px "Oswald"'].map((f) => document.fonts.load(f, sfText)))));
+    fonts.push(istReady.then(() => document.fonts.load('700 40px "Playfair Display"', sfText)));
+    // Los Angeles: a surf-shop script, the tall blade signs' letters, the picture palaces' deco (and SF's neon and Oswald)
+    const laText = LA_GLYPHS + "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 &·'$?()–-.,";
+    const laCss = document.createElement("link");
+    laCss.rel = "stylesheet";
+    laCss.href = "https://fonts.googleapis.com/css2?family=Pacifico&family=Bungee&family=Limelight&display=swap";
+    const laReady = new Promise((r) => { laCss.onload = laCss.onerror = r; });
+    document.head.appendChild(laCss);
+    fonts.push(laReady.then(() => Promise.all(['400 40px "Pacifico"', '400 40px "Bungee"', '400 40px "Limelight"'].map((f) => document.fonts.load(f, laText)))));
+    fonts.push(sfReady.then(() => Promise.all(['400 40px "Righteous"', '400 40px "Monoton"'].map((f) => document.fonts.load(f, laText)))));
+    fonts.push(mskReady.then(() => Promise.all(['500 40px "Oswald"', '700 40px "Oswald"'].map((f) => document.fonts.load(f, laText)))));
+    fonts.push(istReady.then(() => document.fonts.load('700 40px "Playfair Display"', laText)));
     await Promise.race([
       Promise.all(fonts),
       new Promise((r) => setTimeout(r, 2500)),

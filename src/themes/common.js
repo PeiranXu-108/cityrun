@@ -147,6 +147,13 @@ export function polar(deg, r) {
   const a = deg * Math.PI / 180;
   return [Math.sin(a) * r, -Math.cos(a) * r, -a];
 }
+// a skyline frame's position: polar() gives x and z, the model stands with its foot at y0
+export function polarXZ(deg, r, y0) { const [x, z] = polar(deg, r); return [x, y0, z]; }
+// The skyline's icons stand with their feet only a little below the eye, and where the street opens out (a pond, a
+// river, a park, the water) the ground falls away and the sky showed under them; so their walls carry on down until
+// they are 10° below the eye at their distance r, as deep as the plain skyline blocks reach (to -95 from 560 m out).
+// This is how far, in the icon's own units (frame scale s).
+export function below(y0, s, r) { return (y0 - Math.min(-100, 4.5 - r * Math.tan((10 * Math.PI) / 180))) / s; }
 
 // ---------- landmark helpers ----------
 export function farGround(b, side, color, y = -0.2) {
