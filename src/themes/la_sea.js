@@ -15,6 +15,11 @@ const COLS = {
   cHaze: col('#eaa890'), cGold: col('#ffca80', 1.2), cShallow: col('#a87888'), cFoam: col('#fff0ea', 0.8), cWet: col('#5a3e40'),
 };
 
+// Los Angeles's own uniforms; another sea (Dubai's Gulf) brings its own clock, sun bearing and colours: seaUniforms()
+const LA_U = { ...seaU, ...COLS };
+export const seaUniforms = (cols) => ({ uTime: { value: 0 }, uSunAz: { value: 0 },
+  ...Object.fromEntries(Object.entries(cols).map(([k, [hex, m = 1]]) => [k, { value: new THREE.Color(hex).multiplyScalar(m) }])) });
+
 const COMMON = `
   #define PI 3.14159265
   uniform float uTime, uSunAz;
@@ -44,9 +49,9 @@ const COMMON = `
 `;
 
 // The near water, bent with the world. Its geometry carries uv = (metres out from the waterline, metres along the stretch).
-export function seaMat() {
+export function seaMat(U = LA_U) {
   return new THREE.ShaderMaterial({
-    uniforms: { ...seaU, ...COLS, uCurveY: curveUniforms.uCurveY, uCurveX: curveUniforms.uCurveX },
+    uniforms: { ...U, uCurveY: curveUniforms.uCurveY, uCurveX: curveUniforms.uCurveX },
     vertexShader: `${COMMON}
       uniform float uCurveY, uCurveX;
       varying vec3 vDir; varying vec3 vW; varying float vD, vLift, vDepth;
@@ -91,9 +96,9 @@ export function seaMat() {
 
 // The swash, laid over the sand along the waterline (the same uv): each wave's whitewater running up the beach,
 // its lace of foam at the front, the film of water sliding back; the sand dark and glossy where the waves have been.
-export function swashMat() {
+export function swashMat(U = LA_U) {
   return new THREE.ShaderMaterial({
-    uniforms: { ...seaU, ...COLS, uCurveY: curveUniforms.uCurveY, uCurveX: curveUniforms.uCurveX },
+    uniforms: { ...U, uCurveY: curveUniforms.uCurveY, uCurveX: curveUniforms.uCurveX },
     transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
     vertexShader: `${COMMON}
       uniform float uCurveY, uCurveX;
@@ -137,9 +142,9 @@ export function swashMat() {
 
 // The open sea on the skyline: not bent, it follows the camera; the same colour, the glitter of the sun's road, a faint
 // grain of swell lines drawn closer together toward the horizon.
-export function farSeaMat() {
+export function farSeaMat(U = LA_U) {
   return new THREE.ShaderMaterial({
-    uniforms: { ...seaU, ...COLS },
+    uniforms: { ...U },
     side: THREE.DoubleSide,
     vertexShader: `
       varying vec3 vDir;

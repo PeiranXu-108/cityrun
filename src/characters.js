@@ -37,6 +37,8 @@ export const CHARACTERS = [
     skin: '#f4d8c0', top: '#ff7ab8', pants: '#5a7ab0', shoes: '#8a5a3a', sole: '#ffd166', hat: '#ffffff', hair: '#b8803a', accent: '#d8dce4', pack: '#a8703a', trail: '#ff8ad8' },
   { id: 'surfer', name: '冲浪少年', en: 'SURFER', price: 8000, desc: '在威尼斯海滩边长大的冲浪少年：头发被太阳晒褪成金色，墨镜推到头顶，敞开的夏威夷衬衫里套着白背心，脖子上一串贝壳项链，冲浪短裤配人字拖，背上斜挎一块冲浪板；待机时比出 shaka 手势（拇指和小指伸开），像踩在浪板上一样压低身子，左右晃着找平衡', style: 'surfer',
     skin: '#d49a6a', top: '#2ab4a8', pants: '#ff7a3a', shoes: '#ff5a3a', sole: '#ffd166', hat: '#1a1a22', hair: '#f2d27a', accent: '#f4f0e8', pack: '#f4f0e8', trail: '#3ad8ff' },
+  { id: 'falconer', name: '猎鹰少年', en: 'FALCONER', price: 8500, desc: '在沙漠边长大的阿联酋少年：一身雪白的坎杜拉长袍，领口垂着一根流苏，白头巾垂到肩后、压着黑色双圈头箍，左臂的皮手套上站着一只戴皮头罩的游隼；跑起来猎鹰张开翅膀保持平衡，站着时它会扑扇一阵翅膀', style: 'falconer',
+    skin: '#c8946a', top: '#f6f4ee', pants: '#f2f0ea', shoes: '#7a4a2a', sole: '#ffd166', hat: '#f8f6f0', hair: '#1a1410', accent: '#c8a050', pack: '#7a5232', trail: '#ffd27a' },
 ];
 // triangular pennant for the opera general's back flags (靠旗)
 const FLAG = new THREE.BufferGeometry();
@@ -44,6 +46,7 @@ FLAG.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, -0.3
 FLAG.computeVertexNormals();
 const EAR = new THREE.ConeGeometry(0.5, 1, 4);
 const TOR = new THREE.TorusGeometry(0.5, 0.12, 8, 28);
+const CORD = new THREE.TorusGeometry(0.5, 0.06, 6, 28);
 
 const RB = new RoundedBoxGeometry(1, 1, 1, 2, 0.22);
 const BOX = new THREE.BoxGeometry(1, 1, 1);
@@ -104,7 +107,7 @@ function part(geo, mat, x, y, z, sx, sy, sz, parent) {
 const grp = (parent, x = 0, y = 0, z = 0) => { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; };
 
 export function buildCharacter(d) {
-  const robot = d.style === 'robot', panda = d.style === 'panda', guard = d.style === 'guard', neko = d.style === 'neko', rabbit = d.style === 'rabbit', liberty = d.style === 'liberty', koala = d.style === 'koala', guardsman = d.style === 'guardsman', naxi = d.style === 'naxi', paris = d.style === 'paris', lion = d.style === 'lion', nezha = d.style === 'nezha', dondurma = d.style === 'dondurma', swan = d.style === 'swan', hippie = d.style === 'hippie', surfer = d.style === 'surfer';
+  const robot = d.style === 'robot', panda = d.style === 'panda', guard = d.style === 'guard', neko = d.style === 'neko', rabbit = d.style === 'rabbit', liberty = d.style === 'liberty', koala = d.style === 'koala', guardsman = d.style === 'guardsman', naxi = d.style === 'naxi', paris = d.style === 'paris', lion = d.style === 'lion', nezha = d.style === 'nezha', dondurma = d.style === 'dondurma', swan = d.style === 'swan', hippie = d.style === 'hippie', surfer = d.style === 'surfer', falconer = d.style === 'falconer';
   const root = new THREE.Group();
   const body = grp(root, 0, 0.6, 0);         // roll / lean pivot
   const inner = grp(body, 0, -0.6, 0);
@@ -136,7 +139,7 @@ export function buildCharacter(d) {
   const torso = grp(hips, 0, 0, 0);
   let tail = null;
   part(RB, mTop, 0, 0.32, guard ? 0.03 : 0, 0.52 * wide, 0.62, guard ? 0.4 : 0.3, torso);
-  if (!panda && !guard && !neko && !rabbit && !liberty && !koala && !guardsman && !naxi && !paris && !lion && !nezha && !dondurma && !swan && !hippie && !surfer) part(BOX, E(d.accent, 2.6), 0, 0.38, -0.152, 0.53, 0.05, 0.012, torso);
+  if (!panda && !guard && !neko && !rabbit && !liberty && !koala && !guardsman && !naxi && !paris && !lion && !nezha && !dondurma && !swan && !hippie && !surfer && !falconer) part(BOX, E(d.accent, 2.6), 0, 0.38, -0.152, 0.53, 0.05, 0.012, torso);
   if (robot) {
     part(SPH, E(d.accent, 3), 0, 0.42, -0.16, 0.14, 0.14, 0.05, torso);
   }
@@ -201,6 +204,11 @@ export function buildCharacter(d) {
     part(RB, vest, 0, 0.36, 0.06, 0.54, 0.56, 0.2, torso);                                // its back
     part(BOX, M(d.hat, 0.6), 0, 0.07, 0, 0.56, 0.12, 0.34, torso);                        // the red sash
     part(BOX, gold, 0, 0.07, -0.172, 0.56, 0.03, 0.01, torso);
+  } else if (falconer) {
+    part(FEZ, mTop, 0, -0.1, 0, 0.64, 0.34, 0.44, torso);                            // the kandura flaring over the hips
+    part(CYL, M('#ecebe4', 0.6), 0, 0.6, -0.02, 0.24, 0.05, 0.2, torso);              // its round collar
+    part(CYL, M('#f2f0e8', 0.5), 0, 0.44, -0.158, 0.022, 0.24, 0.022, torso);          // the tarboosha: the tassel hanging from the neck
+    part(SPH, M('#f2f0e8', 0.5), 0, 0.31, -0.16, 0.05, 0.07, 0.05, torso);
   } else if (swan) {
     const tulle = M(d.pack, 0.9), silver = M(d.accent, 0.25, 0.6);
     part(CYL, tulle, 0, 0.04, 0, 1.0, 0.07, 0.92, torso);                              // the tutu: layers of tulle standing out flat from the hips
@@ -368,6 +376,14 @@ export function buildCharacter(d) {
     part(CYL, M('#141414', 0.8), 0, -0.02, 0.09, 0.03, 0.2, 0.03, tail).rotation.x = 1.2;
     part(BOX, M(d.hair, 0.6), 0, 0.105, -0.155, 0.17, 0.045, 0.02, head);              // a big moustache
     for (const sx of [-1, 1]) part(BOX, M(d.hair, 0.6), sx * 0.075, 0.27, -0.152, 0.06, 0.018, 0.01, head);   // and eyebrows
+  } else if (falconer) {
+    const cloth = M(d.hat, 0.85), cord = M('#141414', 0.6);
+    part(RB, cloth, 0, 0.305, 0.01, 0.37, 0.22, 0.35, head);                        // the ghutra over the crown
+    part(BOX, cloth, 0, 0.32, -0.158, 0.35, 0.05, 0.02, head);                       // its edge across the brow
+    for (const sx of [-1, 1]) part(BOX, cloth, sx * 0.178, 0.13, 0.02, 0.035, 0.36, 0.31, head);   // falling either side of the face
+    part(BOX, cloth, 0, 0.06, 0.165, 0.38, 0.5, 0.04, head);                         // and down the back to the shoulders
+    for (const y of [0.335, 0.38]) part(CORD, cord, 0, y, 0.01, 0.4, 0.4, 0.4, head).rotation.x = Math.PI / 2;   // the agal: two black cords round the crown
+    for (const sx of [-1, 1]) part(BOX, M(d.hair, 0.6), sx * 0.07, 0.25, -0.152, 0.07, 0.016, 0.01, head);   // eyebrows
   } else if (swan) {
     part(RB, M(d.hair, 0.7), 0, 0.27, 0.03, 0.34, 0.16, 0.33, head);                  // hair drawn back smooth
     part(SPH, M(d.hair, 0.7), 0, 0.36, 0.12, 0.18, 0.16, 0.16, head);                 // the bun
@@ -492,7 +508,38 @@ export function buildCharacter(d) {
     part(BOX, mSkin, 0.065, -0.42, -0.02, 0.035, 0.12, 0.035, AR.el).rotation.z = -0.75;
     part(CYL, M('#ffd23d', 0.6), 0, -0.24, 0, 0.15, 0.04, 0.15, AL.el);                // a woven bracelet
   }
-  return { root, body, inner, hips, torso, head, tail, L, R, AL, AR, spin, def: d };
+  const wings = [];
+  if (falconer) {
+    for (const F of [L, R]) {   // the kandura's skirts down to the ankles, swinging with the legs
+      part(RB, mPants, 0, -0.22, 0, 0.27, 0.52, 0.3, F.thigh);
+      part(FEZ, mPants, 0, -0.24, 0, 0.3, 0.46, 0.31, F.knee);
+      F.foot.children[0].material = M('#c8946a', 0.7);                                   // bare feet in sandals
+      part(BOX, M(d.shoes, 0.6), 0, -0.07, -0.07, 0.25, 0.04, 0.42, F.foot);
+      part(BOX, M(d.shoes, 0.6), 0, 0.0, -0.14, 0.22, 0.03, 0.06, F.foot);
+    }
+    const leather = M(d.pack, 0.8);
+    part(CYL, leather, 0, -0.22, 0, 0.17, 0.24, 0.17, AL.el);                         // the falconer's gauntlet
+    part(CYL, M('#5a3a22', 0.8), 0, -0.1, 0, 0.19, 0.04, 0.19, AL.el);
+    // the falcon: a peregrine standing on the glove, hooded, facing the way he runs (the forearm is held level in front)
+    const fg = grp(AL.el, 0, -0.26, -0.09); fg.rotation.x = -Math.PI / 2;
+    const back = M('#5a5e66', 0.7), cream = M('#efe4cc', 0.8), bar = M('#3a3a40', 0.7);
+    for (const sx of [-1, 1]) part(CYL, M('#e8c040', 0.5), sx * 0.035, 0.02, 0, 0.025, 0.05, 0.025, fg);   // its yellow feet
+    part(SPH, back, 0, 0.13, 0.01, 0.15, 0.21, 0.17, fg).rotation.x = 0.3;           // the body, the chest pushed out
+    part(SPH, cream, 0, 0.13, -0.045, 0.115, 0.17, 0.08, fg).rotation.x = 0.3;      // its pale barred breast
+    for (let k = 0; k < 6; k++) part(SPH, bar, -0.03 + (k % 3) * 0.03, 0.08 + Math.floor(k / 3) * 0.05, -0.085, 0.018, 0.012, 0.01, fg);
+    part(BOX, back, 0, 0.03, 0.12, 0.075, 0.022, 0.17, fg).rotation.x = 0.55;       // the tail
+    part(SPH, back, 0, 0.27, -0.02, 0.1, 0.1, 0.1, fg);                               // the head
+    part(SPH, leather, 0, 0.29, -0.015, 0.105, 0.085, 0.105, fg);                     // the leather hood (burqa) over it
+    part(SPH, M(d.accent, 0.5, 0.3), 0, 0.345, -0.01, 0.03, 0.04, 0.03, fg);           // the hood's knot on top
+    part(CONE, M('#3a3a3a', 0.4), 0, 0.255, -0.085, 0.032, 0.05, 0.032, fg).rotation.x = -Math.PI / 2;   // the hooked beak
+    for (const sx of [-1, 1]) {   // the wings: hinged at the shoulders, folded along its sides or spread (the Animator works them)
+      const w = grp(fg, sx * 0.06, 0.19, 0.0);
+      part(SPH, back, sx * 0.11, -0.02, 0.03, 0.22, 0.05, 0.2, w);
+      part(BOX, M('#3e4148', 0.7), sx * 0.22, -0.035, 0.08, 0.16, 0.014, 0.1, w);    // the dark primaries at its tip
+      wings.push({ w, sx });
+    }
+  }
+  return { root, body, inner, hips, torso, head, tail, L, R, AL, AR, spin, wings, def: d };
 }
 
 // Pose solver for the procedural rigs.
@@ -513,6 +560,7 @@ export class Animator {
         if (s.mode === 'stumble') { P.tz = Math.sin(t * 28) * 0.35; P.aL = -2.2; P.aR = -1.6; P.zL = -0.9; P.zR = 0.9; }
         else if (r.def.style === 'liberty') { P.aR = -2.75; P.eR = 0.2; P.zR = 0.15; }   // runs with the torch held high
         else if (r.def.style === 'dondurma') { P.aR = -2.65 + Math.sin(this.ph) * 0.12; P.eR = 0.25; P.zR = 0.18; }   // the paddle held up like a banner
+        else if (r.def.style === 'falconer') { P.aL = 0.25 + Math.sin(this.ph) * 0.05; P.eL = 1.45; P.zL = -0.18; }   // the gauntlet held level in front, the falcon on it
         break;
       }
       case 'jump':
@@ -536,6 +584,7 @@ export class Animator {
         if (r.def.style === 'neko') { const w = Math.sin(t * 5); P.aL = -2.7 + w * 0.3; P.eL = 1.0 + w * 0.45; P.zL = -0.2; }   // beckoning paw
         if (r.def.style === 'liberty') { P.aR = -2.95; P.eR = 0.1; P.zR = 0.1; }   // torch raised
         if (r.def.style === 'guardsman') { P.aL = 0.02; P.aR = 0.02; P.eL = 0.12; P.eR = 0.12; P.zL = -0.06; P.zR = 0.06; P.hy = 0; P.bob = 0; }   // standing to attention
+        if (r.def.style === 'falconer') { P.aL = 0.35; P.eL = 1.5; P.zL = -0.2; P.hy = -0.3 + Math.sin(t * 0.7) * 0.25; }   // showing off his falcon
         if (r.def.style === 'dondurma') { const w = Math.sin(t * 5); P.aR = -2.2 + w * 0.6; P.eR = 0.5 + w * 0.45; P.zR = 0.22; P.hy = Math.sin(t * 1.3) * 0.5; }   // teasing a customer with the paddle
         if (r.def.style === 'swan') { const w = Math.sin(t * 2.2); P.aL = -0.1; P.aR = -0.1; P.zL = -1.25 - w * 0.28; P.zR = 1.25 + w * 0.28; P.eL = 0.35 + Math.sin(t * 2.2 + 0.9) * 0.3; P.eR = P.eL; P.hy = Math.sin(t * 0.7) * 0.3; }   // Odette's arms, rising and falling like wings
         if (r.def.style === 'hippie') { const w = Math.sin(t * 1.8); P.aR = -2.75; P.eR = 0.35 + Math.sin(t * 3.6) * 0.08; P.zR = 0.3; P.aL = 0.1; P.zL = -0.25 - w * 0.08; P.hy = w * 0.35; P.tz = w * 0.08; P.bob = Math.abs(Math.sin(t * 3.6)) * 0.03; }   // peace, swaying to the music
@@ -557,6 +606,11 @@ export class Animator {
     r.inner.position.y = -0.6 + c.bob;
     if (r.tail) r.tail.rotation.x = 0.35 + Math.sin(this.ph * 2) * 0.25;
     if (r.spin) for (const w of r.spin) w.rotation.x -= dt * 14;
+    if (r.wings && r.wings.length) {   // the falcon: wings half open for balance as he runs, spread in the air, folded tight in a roll, a burst of flapping now and then at rest
+      const p = t % 4.6;
+      const f = s.mode === 'run' ? 0.55 + 0.12 * Math.sin(this.ph * 2) : s.mode === 'jump' || s.mode === 'fly' ? 0.95 + 0.08 * Math.sin(t * 16) : s.mode === 'roll' ? 0 : s.mode === 'dead' ? 0.8 : p < 1.2 ? 0.5 + 0.5 * Math.sin(p * 17) : 0.04;
+      for (const { w, sx } of r.wings) w.rotation.z = sx * (-1.25 + 1.45 * f);
+    }
     // roll / flips / lean on the pivot
     if (s.mode === 'roll') this.roll -= dt * 15;
     else if (s.flip !== undefined && s.flip > 0) this.roll = -s.flip * Math.PI * 2;

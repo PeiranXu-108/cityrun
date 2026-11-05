@@ -45,6 +45,7 @@ import { GLYPHS as IST_GLYPHS } from "./themes/istanbul_kit.js";
 import { GLYPHS as MSK_GLYPHS } from "./themes/moscow_kit.js";
 import { GLYPHS as SF_GLYPHS } from "./themes/sf_kit.js";
 import { GLYPHS as LA_GLYPHS } from "./themes/la_kit.js";
+import { GLYPHS as DXB_GLYPHS } from "./themes/dubai_kit.js";
 import { POWERUPS } from "./props.js";
 import { Run } from "./game.js";
 import { audio } from "./audio.js";
@@ -306,6 +307,9 @@ function buyChar(def) {
 }
 
 const frameWait = () => new Promise((r) => requestAnimationFrame(() => r()));
+// a city whose signs are drawn in a script the page's fonts lack (Dubai's Arabic) waits for its fonts before its
+// textures are painted (they are painted once), but never for long
+const cityFonts = {};
 
 async function loadCity(ids, msg) {
   const todo = ids.filter((id) => !world.assets[id]);
@@ -318,6 +322,7 @@ async function loadCity(ids, msg) {
     );
     await frameWait();
     await frameWait();
+    if (cityFonts[todo[i]]) await Promise.race([cityFonts[todo[i]], new Promise((r) => setTimeout(r, 6000))]);
     world.ensureTheme(todo[i]);
     warmup(todo[i]);
   }
@@ -938,6 +943,19 @@ async function boot() {
     fonts.push(sfReady.then(() => Promise.all(['400 40px "Righteous"', '400 40px "Monoton"'].map((f) => document.fonts.load(f, laText)))));
     fonts.push(mskReady.then(() => Promise.all(['500 40px "Oswald"', '700 40px "Oswald"'].map((f) => document.fonts.load(f, laText)))));
     fonts.push(istReady.then(() => document.fonts.load('700 40px "Playfair Display"', laText)));
+    // Dubai's signs are in Arabic and English: Noto Kufi Arabic for the shop boards, the road signs and the towers, Aref
+    // Ruqaa's calligraphy for the souks and the old town (whole families, not subsets, so that every joining form of every
+    // letter is there); the English in the Oswald and Playfair Display loaded above
+    const dxbText = DXB_GLYPHS + "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 &·'-.,";
+    const dxbCss = document.createElement("link");
+    dxbCss.rel = "stylesheet";
+    dxbCss.href = "https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@700;900&family=Aref+Ruqaa:wght@700&display=swap";
+    const dxbReady = new Promise((r) => { dxbCss.onload = dxbCss.onerror = r; });
+    document.head.appendChild(dxbCss);
+    cityFonts.dubai = dxbReady.then(() => Promise.all(['700 40px "Noto Kufi Arabic"', '900 40px "Noto Kufi Arabic"', '700 40px "Aref Ruqaa"'].map((f) => document.fonts.load(f, dxbText)))).catch(() => {});
+    fonts.push(cityFonts.dubai);
+    fonts.push(mskReady.then(() => Promise.all(['500 40px "Oswald"', '700 40px "Oswald"'].map((f) => document.fonts.load(f, dxbText)))));
+    fonts.push(istReady.then(() => Promise.all(['700 40px "Playfair Display"', '900 40px "Playfair Display"'].map((f) => document.fonts.load(f, dxbText)))));
     await Promise.race([
       Promise.all(fonts),
       new Promise((r) => setTimeout(r, 2500)),
@@ -957,7 +975,8 @@ async function boot() {
   let delay = 1200;
   for (const id of THEME_ORDER) {
     if (world.assets[id]) continue;
-    setTimeout(() => {
+    setTimeout(async () => {
+      if (cityFonts[id]) await Promise.race([cityFonts[id], new Promise((r) => setTimeout(r, 6000))]);
       if (state === "menu" && !world.assets[id]) {
         world.ensureTheme(id);
         warmup(id);

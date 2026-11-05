@@ -399,7 +399,54 @@ export function barrierStyle({
 }
 
 // ---------- coins ----------
+// The triangulation leaves a few zero-area triangles where an outline runs straight through a vertex (the dallah's): their
+// normals are zero, and when one rasterises as a sliver it shades to NaN, which bloom smears across the screen. Drop them
+// (and any sliver too thin to see) from a non-indexed geometry.
+function dropDegenerate(g) {
+  const P = g.attributes.position, keep = [];
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (let t = 0; t < P.count; t += 3) {
+    a.fromBufferAttribute(P, t); b.fromBufferAttribute(P, t + 1); c.fromBufferAttribute(P, t + 2);
+    if (b.sub(a).cross(c.sub(a)).lengthSq() > 1e-14) keep.push(t);
+  }
+  const out = new THREE.BufferGeometry();
+  for (const [name, attr] of Object.entries(g.attributes)) {
+    const n = attr.itemSize, dst = new Float32Array(keep.length * 3 * n);
+    keep.forEach((t, i) => dst.set(attr.array.subarray(t * n, (t + 3) * n), i * 3 * n));
+    out.setAttribute(name, new THREE.BufferAttribute(dst, n));
+  }
+  g.dispose();
+  return out;
+}
+
 export function coinGeometry(kind) {
+  if (kind === "dirham") {
+    // the UAE's one-dirham coin: the dallah, the Arabic coffee pot, punched through it (its crescent beak of a spout, the
+    // pointed lid and its finial, the handle a hole of its own), a ring of beads round the rim
+    const s = new THREE.Shape();
+    s.absarc(0, 0, 0.43, 0, Math.PI * 2, false);
+    const hole = (pts) => {
+      const h = new THREE.Path();
+      pts.forEach(([x, y], i) => (i ? h.lineTo(x, y) : h.moveTo(x, y)));
+      h.closePath();
+      s.holes.push(h);
+    };
+    hole([[-0.1, -0.28], [0.1, -0.28], [0.075, -0.25], [0.12, -0.2], [0.135, -0.13], [0.125, -0.07],
+      [0.17, -0.05], [0.22, -0.01], [0.255, 0.05], [0.278, 0.125], [0.252, 0.112], [0.222, 0.062], [0.178, 0.022], [0.11, -0.005],
+      [0.07, 0.03], [0.09, 0.08], [0.07, 0.1], [0.045, 0.18], [0.02, 0.235], [0.022, 0.25], [0.012, 0.29], [-0.012, 0.29], [-0.022, 0.25],
+      [-0.02, 0.235], [-0.045, 0.18], [-0.07, 0.1], [-0.09, 0.08], [-0.07, 0.03], [-0.125, -0.07], [-0.135, -0.13], [-0.12, -0.2], [-0.075, -0.25]]);
+    const handle = [];
+    for (let i = 0; i <= 10; i++) { const a = ((100 + i * 16) * Math.PI) / 180; handle.push([-0.155 + Math.cos(a) * 0.105, -0.03 + Math.sin(a) * 0.105]); }
+    for (let i = 10; i >= 0; i--) { const a = ((100 + i * 16) * Math.PI) / 180; handle.push([-0.155 + Math.cos(a) * 0.072, -0.03 + Math.sin(a) * 0.072]); }
+    hole(handle);
+    for (let k = 0; k < 20; k++) {   // (six-sided: the beads cost little)
+      const a = (k / 20) * Math.PI * 2, cx = Math.cos(a) * 0.385, cy = Math.sin(a) * 0.385;
+      hole(Array.from({ length: 6 }, (_, i) => [cx + Math.cos((i / 6) * Math.PI * 2) * 0.013, cy + Math.sin((i / 6) * Math.PI * 2) * 0.013]));
+    }
+    const g = new THREE.ExtrudeGeometry(s, { depth: 0.07, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.01, bevelSegments: 2, curveSegments: 14 });
+    g.translate(0, 0, -0.035);
+    return dropDegenerate(g);
+  }
   if (kind === "star") {
     // Los Angeles's coin: a star of the Walk of Fame in gold, the round emblem in its middle punched through
     const s = new THREE.Shape();

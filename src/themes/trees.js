@@ -1503,3 +1503,133 @@ export function laTreeKit() {
     strelitzia(b, x, z, s = 1, { y = 0 } = {}) { b.addM(pick(B), bird, place(x, y, z, rand(0, Math.PI), s), null); },
   };
 }
+
+// ---------- Dubai: date palms (some with their trunks wrapped in warm lights), the ghaf, fan palms, bougainvillea ----------
+// Phoenix dactylifera: a slim, slightly curving trunk patterned with the diamond stubs of old leaf bases, a crown of stiff
+// grey-green pinnate fronds rising and arching over, clusters of orange dates hanging under it. The ghaf (Prosopis
+// cineraria), the Emirates' national tree: a short twisted trunk, a low broad crown of fine drooping grey-green leaves.
+// One bark for every trunk, so the trees of a chunk cost few draws.
+function dateBarkTex() {   // the criss-cross of leaf-base stubs up a date palm's trunk
+  return canvasTex(64, 128, (g, w, h) => {
+    g.fillStyle = '#7a6448'; g.fillRect(0, 0, w, h);
+    for (let y = -16; y < h + 16; y += 12) for (let x = -16; x < w + 16; x += 16) {
+      const ox = (Math.floor(y / 12) % 2) * 8;
+      g.fillStyle = pick(['#8a7252', '#6e5a40', '#947a58', '#5e4c36']);
+      g.beginPath(); g.moveTo(x + ox, y); g.lineTo(x + ox + 8, y + 6); g.lineTo(x + ox, y + 12); g.lineTo(x + ox - 8, y + 6); g.closePath(); g.fill();
+      g.strokeStyle = 'rgba(40,30,20,0.55)'; g.lineWidth = 1.2; g.stroke();
+    }
+  });
+}
+function dateFrondTex() {   // a date palm's frond: stiff, narrow, grey-green leaflets in a V along the midrib, spines at its foot
+  return canvasTex(64, 256, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    g.strokeStyle = '#8a8a5a'; g.lineWidth = 3; g.beginPath(); g.moveTo(w / 2, h); g.lineTo(w / 2, 0); g.stroke();
+    for (let y = h - 4; y > 3; y -= 4) {
+      const t = y / h, len = (w / 2 - 2) * Math.min(1, 0.25 + Math.sin(Math.PI * Math.min(1, (1 - t) * 1.2 + 0.1)) * 0.95);
+      g.strokeStyle = t > 0.85 ? '#9a8a5a' : pick(['#6e8a5c', '#7a9662', '#5f7c52', '#86a06a']); g.lineWidth = t > 0.85 ? 1.2 : 2;
+      for (const s of [-1, 1]) { g.beginPath(); g.moveTo(w / 2, y); g.lineTo(w / 2 + s * len, y - len * 0.75); g.stroke(); }
+    }
+  }, { repeat: false });
+}
+function ghafTex() {   // the ghaf's fine bipinnate leaves hanging in sprays, grey-green
+  return canvasTex(128, 128, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    for (let i = 0; i < 22; i++) {
+      const x = rand(8, 120), y = rand(0, 40), len = rand(50, 86), c = pick(['#7a8e6a', '#8a9c74', '#6a7e5c', '#94a47e']);
+      g.strokeStyle = '#6a6448'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + rand(-8, 8), y + len * 0.5, x + rand(-6, 6), y + len); g.stroke();
+      for (let k = 4; k < len; k += 3.5) for (const s of [-1, 1]) { g.fillStyle = c; g.beginPath(); g.ellipse(x + s * 3, y + k, 3.2, 1.1, s * 0.5, 0, Math.PI * 2); g.fill(); }
+    }
+  }, { repeat: false });
+}
+function datePalmTemplate(Hmin = 7, Hmax = 11) {
+  const wood = [], parts = [], L = new Leaves();
+  const H = rand(Hmin, Hmax), lx = rand(-0.7, 0.7), lz = rand(-0.7, 0.7), top = V(lx, H, lz), mid = V(lx * 0.35 + rand(-0.2, 0.2), H * 0.5, lz * 0.35 + rand(-0.2, 0.2));
+  limb(wood, V(0, -0.3, 0), V(0, 0.8, 0), 0.42, 0.32, 8);   // the swollen foot
+  limb(wood, V(0, 0.7, 0), mid, 0.32, 0.28, 8);
+  limb(wood, mid, top, 0.28, 0.26, 8);
+  joint(wood, top, 0.36);
+  const n = randi(22, 28);
+  for (let i = 0; i < n; i++) {   // the fronds: the young ones standing up, the old ones arching out and down
+    const az = (i / n) * Math.PI * 2 * 2.618 + rand(-0.15, 0.15), kind = i % 4;
+    const len = rand(3.2, 4.4) * (kind === 0 ? 0.85 : 1), rise = kind === 0 ? rand(1.6, 2.2) : kind === 3 ? rand(0.1, 0.5) : rand(0.6, 1.2);
+    const out = V(Math.cos(az), 0, Math.sin(az)), side = V(-Math.sin(az), 0, Math.cos(az)), tint = new THREE.Color('#ffffff').multiplyScalar(rand(0.82, 1.05));
+    let prev = null;
+    for (let k = 0; k <= 6; k++) {
+      const t = k / 6, wd = 0.42 * Math.sin(Math.PI * Math.min(1, t * 1.1 + 0.06));
+      const c = top.clone().addScaledVector(out, len * t * (kind === 0 ? 0.55 : 1)).add(V(0, len * (rise * t - 1.0 * t * t) + 0.2, 0));
+      const a0 = c.clone().addScaledVector(side, -wd), a1 = c.clone().addScaledVector(side, wd);
+      if (prev) L.quad(prev[0], prev[1], a0, a1, V(0, 1, 0), prev[2], t, tint, prev[2] * 0.85, t * 0.85);
+      prev = [a0, a1, t];
+    }
+  }
+  for (let k = randi(3, 5); k > 0; k--) {   // the dates, hanging in heavy orange bunches under the crown
+    const az = rand(0, Math.PI * 2), c = top.clone().add(V(Math.cos(az) * 0.55, -0.55 - rand(0, 0.3), Math.sin(az) * 0.55));
+    const g = new THREE.SphereGeometry(0.32, 6, 5); g.scale(1, 1.5, 1); g.translate(c.x, c.y, c.z);
+    parts.push(bakeCol(g.toNonIndexed(), pick(['#e0902a', '#d87a1e', '#f0b030', '#c8641a']), 0.12));
+    const st = new THREE.CylinderGeometry(0.03, 0.03, 0.6, 4); st.translate(c.x * 0.5 + top.x * 0.5, c.y + 0.45, c.z * 0.5 + top.z * 0.5);
+    parts.push(bakeCol(st.toNonIndexed(), '#c8a050'));
+  }
+  return { H, axis: [V(0, 0.6, 0), mid, top], wood: mergeGeometries(wood), parts: mergeGeometries(parts), leaves: L.geometry() };
+}
+function ghafTemplate() {
+  const wood = [], L = new Leaves();
+  const r = rand(0.2, 0.26), A = V(rand(-0.3, 0.3), rand(1.2, 1.6), rand(-0.3, 0.3)), top = V(A.x + rand(-0.5, 0.5), rand(2.4, 3.0), A.z + rand(-0.5, 0.5));
+  limb(wood, V(0, -0.2, 0), A, r * 1.3, r, 7); joint(wood, A, r);
+  limb(wood, A, top, r, r * 0.75, 7); joint(wood, top, r * 0.75);
+  const tint = () => new THREE.Color('#ffffff').multiplyScalar(rand(0.82, 1.04));
+  for (let i = 0; i < 6; i++) {   // the limbs reaching out low and wide, the crown hanging from them
+    const az = (i / 6) * Math.PI * 2 + rand(-0.4, 0.4), d = V(Math.cos(az), 0.45, Math.sin(az)).normalize();
+    let p = (i % 2 ? A : top).clone(), br = r * 0.6;
+    for (let k = 0; k < 3; k++) {
+      d.y -= 0.12; d.normalize();
+      const q = p.clone().addScaledVector(d, rand(0.9, 1.4));
+      limb(wood, p, q, br, br * 0.65, 5);
+      p = q; br *= 0.65;
+    }
+    for (let j = 0; j < 7; j++) {   // the drooping sprays: cards hanging from the limb's end
+      const c = p.clone().add(V(rand(-0.9, 0.9), rand(-0.3, 0.6), rand(-0.9, 0.9)));
+      L.quad(c.clone().add(V(-0.6, 0.4, 0)), c.clone().add(V(0.6, 0.4, 0)), c.clone().add(V(-0.6, -1.0, 0)), c.clone().add(V(0.6, -1.0, 0)), V(0, 0.4, 1).normalize(), 0, 1, tint(), 0.3, 1);
+      L.quad(c.clone().add(V(0, 0.4, -0.6)), c.clone().add(V(0, 0.4, 0.6)), c.clone().add(V(0, -1.0, -0.6)), c.clone().add(V(0, -1.0, 0.6)), V(1, 0.4, 0).normalize(), 0, 1, tint(), 0.3, 1);
+    }
+  }
+  for (let k = 0; k < 22; k++) { const a = rand(0, Math.PI * 2), rr = Math.sqrt(Math.random()) * 2.6; card(L, V(top.x + Math.cos(a) * rr, top.y + 0.6 + rand(-0.4, 0.5) - rr * 0.25, top.z + Math.sin(a) * rr), rand(1.2, 1.6), tint()); }
+  return { wood: mergeGeometries(wood), leaves: L.geometry() };
+}
+export function dubaiTreeKit() {
+  const bark = std({ map: dateBarkTex(), vertexColors: true, roughness: 0.95 });
+  const frond = foliageMat(dateFrondTex(), { sway: 0.16, alphaTest: 0.45 });
+  const fan = foliageMat(fanLeafTex(), { sway: 0.14, alphaTest: 0.45 });
+  const ghaf = foliageMat(ghafTex(), { sway: 0.1, alphaTest: 0.45 });
+  const drape = foliageMat(bougainTex(), { sway: 0.05, alphaTest: 0.5, emissive: 0.18 });
+  const T = { date: Array.from({ length: 5 }, () => datePalmTemplate()), tall: Array.from({ length: 2 }, () => datePalmTemplate(11, 14)), short: Array.from({ length: 2 }, () => datePalmTemplate(3.5, 5.5)), fan: Array.from({ length: 3 }, () => fanPalmTemplate(false)), ghaf: Array.from({ length: 3 }, ghafTemplate) };
+  const D = Array.from({ length: 3 }, drapeTemplate);
+  const place = (x, y, z, ry, sx, sy = sx, sz = sx) => new THREE.Matrix4().compose(V(x, y, z), new THREE.Quaternion().setFromAxisAngle(UP, ry), V(sx, sy, sz));
+  const _w = V();
+  const K = {
+    // a date palm; lit: its trunk wrapped in a spiral of warm bulbs (as along Dubai's boulevards); returns its crown's height
+    datePalm(b, x, z, s = 1, { ry = rand(0, Math.PI * 2), y = 0, lit = false, size = 'date', light = '#ffd890', k = 2.6 } = {}) {
+      const t = pick(T[size]), m = place(x, y, z, ry, s);
+      b.addM(t.wood, bark, m, '#a08a6a'); b.addM(t.parts, VC.solid, m, null); b.addM(t.leaves, frond, m, null);
+      if (lit) {
+        const [p0, p1, p2] = t.axis, n = Math.round(t.H * 7), col = hdr(light, k);
+        for (let i = 0; i < n; i++) {
+          const f = i / n, a = f * t.H * 4.2, seg = f < 0.5 ? [p0, p1, f * 2] : [p1, p2, f * 2 - 1];
+          _w.lerpVectors(seg[0], seg[1], seg[2]).add(V(Math.cos(a) * 0.31, 0, Math.sin(a) * 0.31)).applyMatrix4(m);
+          b.add(G.box, VC.glow, _w.x, _w.y, _w.z, 0.09 * s, 0.09 * s, 0.09 * s, 0, 0, 0, col);
+        }
+      }
+      return y + t.H * s;
+    },
+    // three date palms from one spot, leaning apart
+    clump(b, x, z, s = 1, opts = {}) { for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2 + rand(-0.3, 0.3); K.datePalm(b, x + Math.cos(a) * 0.9 * s, z + Math.sin(a) * 0.9 * s, s * rand(0.7, 1.0), { ...opts, size: i ? 'date' : 'short' }); } },
+    fanPalm(b, x, z, s = 1, { ry = rand(0, Math.PI * 2), y = 0 } = {}) {
+      const t = pick(T.fan), m = place(x, y, z, ry, s);
+      b.addM(t.wood, bark, m, '#a8988a'); b.addM(t.parts, VC.solid, m, null); b.addM(t.leaves, fan, m, null);
+      return y + t.H * s;
+    },
+    ghaf(b, x, z, s = 1, { ry = rand(0, Math.PI * 2), y = 0 } = {}) { const t = pick(T.ghaf), m = place(x, y, z, ry, s * 1.25); b.addM(t.wood, bark, m, '#8a7a68'); b.addM(t.leaves, ghaf, m, null); },
+    // bougainvillea hanging w wide and h tall from (x, y) down a wall; ry turns the sheet to face its street
+    bougain(b, x, y, z, w, h, ry = 0) { b.addM(pick(D), drape, place(x, y - h / 2, z, ry, w, h, 1), null); },
+  };
+  return K;
+}
