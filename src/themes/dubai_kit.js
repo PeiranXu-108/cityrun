@@ -297,12 +297,13 @@ export function makeKit() {
   K.flagMat = std({ map: flagTex(), roughness: 0.8, side: THREE.DoubleSide, emissive: '#ffffff', emissiveMap: flagTex(), emissiveIntensity: 0.25 });
   K.water = waterMat('#1a3a5a', 8);
   const fac = (tex, k = 1.6, metal = 0.1, rough = 0.6) => std({ map: tex.map, emissiveMap: tex.emissive, emissive: '#ffffff', emissiveIntensity: k, vertexColors: true, roughness: rough, metalness: metal });
-  K.deira = deiraTex(); K.deiraMat = fac(K.deira, 1.5, 0.05, 0.85);
+  // (the lit windows sit at about the bloom's threshold, as Hong Kong's do: whole facades of them over it wash the street out)
+  K.deira = deiraTex(); K.deiraMat = fac(K.deira, 0.9, 0.05, 0.85);
   K.glassT = [glassTex('#3a5a72', '#1a2430', ['#e8f4ff', '#fff4dc', '#d8ecff']), glassTex('#8a7a5a', '#3a3020', ['#fff0d0', '#ffe0a8']), glassTex('#2a3a4a', '#9aa4b0', ['#e8f0ff', '#fff8e8'], { band: 0.45 })];
-  K.glassM = K.glassT.map((t) => fac(t, 1.6, 0.55, 0.25));
-  K.res = resTex(); K.resMat = fac(K.res, 1.5, 0.1, 0.7);
+  K.glassM = K.glassT.map((t) => fac(t, 0.85, 0.55, 0.25));
+  K.res = resTex(); K.resMat = fac(K.res, 0.9, 0.1, 0.7);
   const sw = shopWinTex();
-  K.winMat = basic({ map: sw, color: hdr('#ffffff', 1.05) });
+  K.winMat = basic({ map: sw, color: hdr('#ffffff', 0.95) });
   const tiledP = new Map(), tiledB = new Map();
   K.tiledPlane = (w, d, k) => { const key = `${w.toFixed(2)}|${d.toFixed(2)}|${k}`; if (!tiledP.has(key)) tiledP.set(key, planeUV({ u0: 0, u1: w / k, v0: 0, v1: d / k })); return tiledP.get(key); };
   K.tiledBox = (w, h, d, k = 2) => { const key = `${w.toFixed(1)}|${h.toFixed(1)}|${d.toFixed(1)}|${k}`; if (!tiledB.has(key)) tiledB.set(key, tiledBox(+w.toFixed(1), +h.toFixed(1), +d.toFixed(1), k)); return tiledB.get(key); };
@@ -363,7 +364,7 @@ export function makeKit() {
   };
   const board = (key, w, h, k, draw) => ({ ...slot(key, w, h, draw, 0), k });
   const SHOP_SIGNS = [...new Set([...DEIRA_SIGNS, ...SOUK_SIGNS, ...BLVD_SIGNS, ...MARINA_SIGNS, ...HERITAGE_SIGNS])];
-  SHOP_SIGNS.forEach((sg, i) => { sg.r = board('s' + i, 384, 112, sg.st === 'box' || sg.st === 'green' ? 1.15 : 1.25, (g, w, h) => drawBoard(g, sg, w, h)); });
+  SHOP_SIGNS.forEach((sg, i) => { sg.r = board('s' + i, 384, 112, sg.st === 'box' || sg.st === 'green' ? 0.92 : 1.25, (g, w, h) => drawBoard(g, sg, w, h)); });   // (the white lightboxes kept just under the bloom, so their lettering reads)
   K.plateRects = STREETS.map((st, i) => board('st' + i, 320, 96, 0.9, (g, w, h) => {   // a blue street plate, the white border, Arabic over English
     g.fillStyle = '#1a3a8a'; g.fillRect(0, 0, w, h); g.strokeStyle = '#ffffff'; g.lineWidth = 4; g.strokeRect(5, 5, w - 10, h - 10);
     g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -838,7 +839,7 @@ export function makeKit() {
       t.block(VC.solid, '#f4f4f2', 0, 1.9, L * 0.05, L * 0.17, 1.6, L * 0.6);
       t.box(VC.glow, hdr('#2a3a4e', 1.2), 0, 2.7, L * 0.05, L * 0.172, 0.6, L * 0.56);
       t.block(VC.solid, '#f4f4f2', 0, 3.5, L * 0.12, L * 0.13, 1.2, L * 0.35);
-      t.box(VC.glow, hdr('#ffe8c0', 1.4), 0, 4.1, L * 0.12, L * 0.132, 0.4, L * 0.3);
+      t.box(VC.glow, hdr('#ffe8c0', 1.1), 0, 4.1, L * 0.12, L * 0.132, 0.4, L * 0.3);
       for (let u = -L * 0.4; u < L * 0.4; u += 1.2) t.add(G.sphLow, VC.glow, L * 0.11, 1.6, u, 0.08, 0.08, 0.08, 0, 0, 0, hdr('#bfe6ff', 2.2));
     }, new THREE.Matrix4().makeRotationY(ry).setPosition(x, y, z));
   };
@@ -848,7 +849,7 @@ export function makeKit() {
       const L = 26;
       t.add(G.sph, VC.solid, 0, 0.6, 0, 6, 3, L, 0, 0, 0, '#6a3e1a');
       t.block(VC.solid, '#5a3418', 0, 1.6, 0, 5.4, 2.2, L * 0.7);
-      t.box(VC.glow, hdr('#ffd9a0', 1.3), 0, 2.7, 0, 5.42, 1.1, L * 0.66);
+      t.box(VC.glow, hdr('#ffd9a0', 1.0), 0, 2.7, 0, 5.42, 1.1, L * 0.66);
       t.box(VC.solid, '#e8dcc0', 0, 3.85, 0, 5.8, 0.12, L * 0.74);
       for (let u = -L * 0.38; u < L * 0.38; u += 0.6) for (const e of [-1, 1]) t.add(G.sphLow, VC.glow, e * 2.95, 3.95, u, 0.12, 0.12, 0.12, 0, 0, 0, hdr(pick(['#ff5a8a', '#ffd23d', '#3ad8ff', '#7aff6a']), 2.8));
     }, new THREE.Matrix4().makeRotationY(ry).setPosition(x, y, z));

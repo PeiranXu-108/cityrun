@@ -399,6 +399,26 @@ export function barrierStyle({
 }
 
 // ---------- coins ----------
+// The triangulation leaves a few zero-area triangles where an outline runs straight through a vertex (the dallah's): their
+// normals are zero, and when one rasterises as a sliver it shades to NaN, which bloom smears across the screen. Drop them
+// (and any sliver too thin to see) from a non-indexed geometry.
+function dropDegenerate(g) {
+  const P = g.attributes.position, keep = [];
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (let t = 0; t < P.count; t += 3) {
+    a.fromBufferAttribute(P, t); b.fromBufferAttribute(P, t + 1); c.fromBufferAttribute(P, t + 2);
+    if (b.sub(a).cross(c.sub(a)).lengthSq() > 1e-14) keep.push(t);
+  }
+  const out = new THREE.BufferGeometry();
+  for (const [name, attr] of Object.entries(g.attributes)) {
+    const n = attr.itemSize, dst = new Float32Array(keep.length * 3 * n);
+    keep.forEach((t, i) => dst.set(attr.array.subarray(t * n, (t + 3) * n), i * 3 * n));
+    out.setAttribute(name, new THREE.BufferAttribute(dst, n));
+  }
+  g.dispose();
+  return out;
+}
+
 export function coinGeometry(kind) {
   if (kind === "dirham") {
     // the UAE's one-dirham coin: the dallah, the Arabic coffee pot, punched through it (its crescent beak of a spout, the
@@ -425,7 +445,7 @@ export function coinGeometry(kind) {
     }
     const g = new THREE.ExtrudeGeometry(s, { depth: 0.07, bevelEnabled: true, bevelThickness: 0.025, bevelSize: 0.01, bevelSegments: 2, curveSegments: 14 });
     g.translate(0, 0, -0.035);
-    return g;
+    return dropDegenerate(g);
   }
   if (kind === "star") {
     // Los Angeles's coin: a star of the Walk of Fame in gold, the round emblem in its middle punched through

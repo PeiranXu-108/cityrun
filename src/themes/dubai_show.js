@@ -17,7 +17,7 @@ export function ledMaterial({ base, H, curved = false }) {
       float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
       vec3 hsv(float h, float s, float v){ vec3 k = clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0); return v * mix(vec3(1.0), k, s); }
       void main(){
-        float h = clamp(vP.y / uH, 0.0, 1.0), a = atan(vP.x, vP.z) / 6.2831853 + 0.5;
+        float h = clamp(vP.y / uH, 0.0, 1.0), a = atan(vP.x, abs(vP.z) < 1e-4 ? 1e-4 : vP.z) / 6.2831853 + 0.5;   // (atan(0, 0) is undefined: on the axis)
         float T = 11.0, P = mod(floor(time / T), 8.0), f = fract(time / T);
         // at rest: the silvered glass, its rooms lit here and there, the spire's steel catching the last of the sky
         vec3 c = vec3(0.2, 0.25, 0.34) + vec3(1.0, 0.9, 0.72) * step(0.8, hash(floor(vec2(a * 70.0, h * 180.0)))) * 0.5;
@@ -32,7 +32,7 @@ export function ledMaterial({ base, H, curved = false }) {
         else if (P == 5.0) { float r = fract(h * 3.0 + time * 0.9); c = vec3(1.0, 0.25, 0.5) * 2.2 * smoothstep(0.0, 0.25, r) * (1.0 - r); }
         else if (P == 6.0) c = mix(vec3(0.5, 0.04, 0.12), vec3(2.4, 0.3, 0.55), pow(abs(sin(time * 3.1)), 8.0));
         else if (P == 7.0) c = mix(vec3(0.1, 0.25, 0.6), vec3(0.3, 1.6, 2.2), smoothstep(0.3, 0.7, sin(h * 40.0 - time * 3.0 + a * 12.566) * 0.5 + 0.5));
-        if (f < 0.09) c = mix(c, vec3(2.2), smoothstep(0.04, 0.0, abs(h - f / 0.09)));   // the sweep of white between programmes
+        if (f < 0.09) c = mix(c, vec3(2.2), 1.0 - smoothstep(0.0, 0.04, abs(h - f / 0.09)));   // the sweep of white between programmes
         gl_FragColor = vec4(c * (0.72 + 0.28 * abs(vN.x)), uK);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>

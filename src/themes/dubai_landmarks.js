@@ -12,7 +12,7 @@ import { beam } from './tokyo_kit.js';
 import { frame } from './ny_icons.js';
 import { sparkles } from './paris_kit.js';
 import { KERB, X0, face, SOUK_SIGNS, BLVD_SIGNS, DEIRA_SIGNS } from './dubai_kit.js';
-import { WY } from './dubai_build.js';
+import { WY, LAKE_X } from './dubai_build.js';
 import { burjKhalifa, emiratesTowers, museumOfFuture, dubaiFrame, dubaiOpera, addressSkyView, theOpus, fahidiFort, plainTower, BK, frameTex, calligraphy } from './dubai_icons.js';
 import { ledMaterial } from './dubai_show.js';
 
@@ -29,7 +29,7 @@ export function sceneStyle(K) {
     win: K.glassM[0], winTex: K.glassT[0],
     cWhite: '#f2f0ec', cGlass: '#5a6a88', cGlassHi: '#8a9ab8', cGlassDark: '#2a3040', cSteel: '#c8ccd4', cBand: hdr('#ffe2b0', 1.6), cTip: hdr('#ffffff', 3), cLobby: hdr('#ffe2b0', 1.6),
     cWin: hdr('#ffd9a0', 1.5), cEdge: hdr('#e8f0ff', 2.2), cRed: 0xffffff, cSail: hdr('#ffffff', 1), cPad: hdr('#c8ffd8', 1.6), cStone: '#e8dcc4', cStoneHi: '#f4ecdc', cGold: '#ffffff',
-    cCrown: hdr('#ffd9a0', 2.2), cRes: '#ece6dc', cCoral: '#e8a890', cCoralHi: '#f2bca4', cArch: hdr('#ffc880', 1.6), cWave: '#6a9ad8', cBall: hdr('#e8f0ff', 1.8), cOpera: hdr('#ffd9a0', 1.6),
+    cCrown: hdr('#ffd9a0', 2.2), cRes: '#ece6dc', cCoral: '#e8a890', cCoralHi: '#f2bca4', cArch: hdr('#ffc880', 0.95), cWave: '#6a9ad8', cBall: hdr('#e8f0ff', 1.8), cOpera: hdr('#ffd9a0', 1.6),
     cGreen: '#3a6a34', cCrane: '#e8c030', cDoor: '#3a2410', cGoldK: '#d8b048',
   };
   return K.SS;
@@ -90,38 +90,54 @@ export function dubaiLandmarks(K) {
 
   // ---------- Burj Khalifa and the Dubai Fountain ----------
   // the boardwalk along the lake on the left, the crowd at its rail; the fountain's jets in a long curve on the water
-  // rising and swaying to its show; the tower across the lake, its LEDs playing; Souk Al Bahar's arabesque and its
-  // bridge; the mall and the Address on the right
+  // rising and swaying to its show; Souk Al Bahar's arcades on their island and the footbridge out to it; the tower across
+  // the lake, its LEDs playing, the Address Downtown beside it; the mall on the right
   const N_JET = 34, jetGeo = new THREE.CylinderGeometry(0.12, 0.5, 1, 8, 1, true).translate(0, 0.5, 0);
   const jetTex = canvasTex(32, 128, (g, w, h) => {   // a jet: bright at its foot, thinning to spray at its tip, streaked
     const gr = g.createLinearGradient(0, h, 0, 0); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.7, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
     g.fillStyle = gr; g.fillRect(0, 0, w, h);
     g.globalCompositeOperation = 'destination-out'; for (let i = 0; i < 18; i++) { g.fillStyle = `rgba(0,0,0,${rand(0.2, 0.6)})`; g.fillRect(rand(0, w), 0, rand(1, 3), h); }
   }, { repeat: false });
-  const jetMat = basic({ map: jetTex, color: hdr('#e8f4ff', 0.9), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-  const towerLed = ledMaterial({ base: [-118, 0, -104], H: BK.H * 0.3, curved: true });
+  const jetMat = basic({ map: jetTex, color: hdr('#eef6ff', 0.95), transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide });   // (not additive: seen along the curve, the jets overlap by the dozen)
+  // Burj Khalifa stands across the lake two chunks on (dubai.js's lake chunks keep the water open all the way), at 116 m
+  // small enough to stand whole in the view from the boardwalk; its LEDs play the horizon's programmes; unfogged, being
+  // 240 m off, so its spire stays sharp
+  const TOWER = [-110, 0.2, -222], TS = 0.14;
+  const towerLed = ledMaterial({ base: TOWER, H: BK.H * TS, curved: true });
+  const towerS = { ...SS, glass: towerLed, metal: basic({ vertexColors: true, fog: false, transparent: true }), glow: basic({ vertexColors: true, fog: false, transparent: true }) };   // (fading with its LEDs)
   const fountainScene = () => {
     const b = new Batcher();
     farGround(b, 1, '#2a2622');
-    K.waterPlane(b, -(EDGE + 6), -(EDGE + 190), -10, 200, -0.8);
-    b.box(VC.solid, '#6a4a30', -(EDGE + 3), 0.02, -CHUNK_LEN / 2, 6, 0.08, CHUNK_LEN);   // the boardwalk
+    // the near shore, as along the rest of the lake: the boardwalk, its rail, the crowd at it with their phones up
+    b.box(VC.solid, '#6a4a30', -(EDGE + 3), 0.02, -CHUNK_LEN / 2, 6, 0.08, CHUNK_LEN);
     for (let z = 0; z < CHUNK_LEN; z += 2.2) b.box(VC.metal, '#c8ccd0', -(EDGE + 6), 0.55, -z, 0.06, 1.1, 0.06);
     b.box(VC.metal, '#c8ccd0', -(EDGE + 6), 1.1, -CHUNK_LEN / 2, 0.08, 0.08, CHUNK_LEN);
     for (let k = 0; k < 26; k++) K.person(b, -(EDGE + rand(4.4, 5.6)), -rand(2, 78), { outfit: pick(['tourist', 'tourist', 'casual', 'kandura', 'abaya']), pose: pick(['camera', 'phone', 'phone', 'stand']), ry: Math.PI / 2 + rand(-0.4, 0.4) });   // watching the show, phones up
+    K.throng(b, -(EDGE + 1), -(EDGE + 3.6), 1, CHUNK_LEN - 1, randi(8, 12), { mix: K.MIX.blvd });
     for (let z = 6; z < CHUNK_LEN; z += 18) K.lamp(b, -(EDGE + 1.2), -z, -1, { kind: 'lantern' });
-    for (let k = 0; k < 3; k++) K.abra(b, -rand(EDGE + 60, EDGE + 120), -0.7, -rand(10, 90), { ry: rand(0, 6) });
-    // Souk Al Bahar across the water at the near end, its footbridge, the Palace hotel's towers beyond
-    K.farBank(b, -1, 90, 110);
-    K.arabesqueRow(b, -1, 0, 30, { x0: 95, cafes: 0 });
-    for (const [x, z, h] of [[-150, -30, 70], [-175, -10, 50]]) b.addM(buildingGeo(30, h, 34, K.glassT[1], 3.2, 4.0), K.glassM[1], at(x, 0, z), '#e8dcc8');
-    // the tower across the lake (its LEDs are the horizon's own programmes), the Address Downtown nearer
-    burjKhalifa(frame(b, -118, 0, -104, 0.3, 0.3), { ...SS, glass: towerLed }, { led: towerLed });
-    plainTower(frame(b, -70, 0, -90, 0.42, 0.2), SS, { w: 40, d: 40, h: 300, crown: 'spire', col: '#8a9ab8' });
+    plaque(b, 'نافورة دبي', 'THE DUBAI FOUNTAIN', -(EDGE + 0.4), 2.4, -30, -1, 4.6);
+    K.waterPlane(b, -(EDGE + 6), -LAKE_X, 0, CHUNK_LEN, -0.8);
+    K.farBank(b, -1, LAKE_X, 90);
+    for (let k = 0; k < 3; k++) K.abra(b, -rand(EDGE + 110, EDGE + 160), -0.7, -rand(10, 70), { ry: rand(0, 6) });
+    // Souk Al Bahar on its island out in the lake, its arcades lit, a wind tower or two over them; the footbridge out to it
+    b.box(VC.solid, '#b8ac98', -88, -0.4, -24, 40, 0.9, 44);
+    K.pave(b, -88, -24, 38, 42, 0.06);
+    K.arabesqueRow(b, -1, 8, 44, { x0: 72, cafes: 0 });
+    for (const z of [-15, -33]) K.windTower(b, -80, 12.2, z, { h: 6, w: 3.2, col: '#e8d4b0' });
+    b.box(VC.solid, '#d8d0c0', -(EDGE + 6 + 29), 0.5, -3, 58, 0.4, 3);   // (at the near end, clear of the jets)
+    for (const e of [-1, 1]) b.box(VC.glow, hdr('#ffd9a0', 1.6), -(EDGE + 6 + 29), 1.1, -3 + e * 1.45, 58, 0.08, 0.08);
+    // the tower on its island: the podium and its park, palms in lights round it; the Address Downtown beside it
+    const [tx, ty, tz] = TOWER;
+    b.cyl(VC.solid, '#cfc2a8', tx, -0.35, tz, 16, 1.1, 'cyl'); b.cyl(VC.solid, '#3e6a32', tx, ty + 0.02, tz, 14.5, 0.06, 'cyl');
+    b.cyl(VC.solid, '#cfc2a8', tx - 30, -0.35, tz + 14, 9, 1.1, 'cyl');
+    for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; K.datePalm(b, tx + Math.cos(a) * 13.5, tz + Math.sin(a) * 13.5, rand(0.8, 1.0), { lit: true, y: ty }); }
+    burjKhalifa(frame(b, tx, ty, tz, TS, 0.3), towerS, { led: towerLed });
+    plainTower(frame(b, tx - 30, ty, tz + 14, 0.3, 0.2), SS, { w: 36, d: 36, h: 150, crown: 'spire', col: '#8a9ab8' });
     // the right: the mall's long facade and its sign, palms, the Address Boulevard
     K.kerbLane(b, 1, 0, CHUNK_LEN, { x1: 22 });
     K.jam(b, EDGE + 1.55, 0, CHUNK_LEN, 1, { fill: 0.5, mix: { lux: 3, super: 3, suv: 4, taxi: 3, police: 0.5 } });
-    b.addM(buildingGeo(40, 26, 76, K.glassT[1], 3.2, 4.0), K.glassM[1], at(44, 0, -40), '#e8dcc8');
-    b.box(VC.glow, hdr('#ffe8c0', 1.4), 23.9, 3.5, -40, 0.2, 6, 74);
+    b.addM(K.tiledBox(40, 26, 76, 2.8), K.stuccoMat, at(44, 13, -40), '#e8d8bc');   // its long stone facade
+    b.box(VC.glow, hdr('#ffe8c0', 0.85), 23.9, 2.5, -40, 0.2, 4, 74);   // its lit shopfronts
     K.bi(b, 'دبي مول', 'THE DUBAI MALL', { w: 768, h: 192, color: '#f4e8c8', font: '"Noto Kufi Arabic", sans-serif', enFont: '"Playfair Display", serif' }, 23.6, 15, -40, 18, 4.5, 1, 0, -Math.PI / 2, 0);
     K.palmRow(b, KERB + 1.0, 0, CHUNK_LEN, { step: [10, 13], lit: true });
     K.throng(b, KERB + 1.6, 21, 1, CHUNK_LEN - 1, randi(16, 24), { mix: K.MIX.blvd });
@@ -136,18 +152,39 @@ export function dubaiLandmarks(K) {
   };
 
   // ---------- Dubai Opera ----------
-  // the dhow of glass on its plaza, lit from within; palms in lights; the Address Sky View's two towers and their bridge
+  // at the end of Burj Lake: the dhow of glass on its plaza across a basin of the lake on the left, its profile turned to
+  // the runner coming along the water (dubai.js keeps the lake open before it), lit from within; palms in lights on the
+  // plaza; the Address Sky View's two towers and their bridge over the boulevard on the right
   const operaScene = () => {
-    const b = new Batcher();
-    for (const s of [-1, 1]) { farGround(b, s, '#2a2622'); K.pave(b, s * (EDGE + 10), -CHUNK_LEN / 2, 20, CHUNK_LEN); K.palmRow(b, s * (EDGE + 2.4), 0, CHUNK_LEN, { step: [9, 11], lit: true }); }
-    dubaiOpera(frame(b, 46, 0, -46, 0.8, -Math.PI / 2 + 0.2), SS);
-    plaque(b, 'دبي أوبرا', 'DUBAI OPERA', EDGE + 8, 3, -18, 1, 5);
-    for (let k = 0; k < 4; k++) { const z = -10 - k * 16; b.cyl(VC.solid, '#d8ccb4', EDGE + 14, 0.25, z, 2.2, 0.5, 'cyl'); for (let j = 0; j < 5; j++) b.add(G.cyl, VC.glowAdd, EDGE + 14 + rand(-1, 1), 1.2, z + rand(-1, 1), 0.15, 2.4, 0.15, 0, 0, 0, hdr('#d8f0ff', 0.7)); }   // the plaza's fountains
-    K.throng(b, EDGE + 6, EDGE + 24, 1, CHUNK_LEN - 1, randi(20, 28), { mix: K.MIX.blvd });
-    addressSkyView(frame(b, -62, 0, -60, 0.42, 0.4), SS);
-    K.arabesqueRow(b, -1, 0, 50, { x0: 24 });
-    K.backRow(b, -1, { x0: 90 }); K.backRow(b, 1, { x0: 100 });
-    for (let z = 8; z < CHUNK_LEN; z += 16) K.lamp(b, -(EDGE + 6), -z, -1, { kind: 'lantern' });
+    const b = new Batcher(), xq = EDGE + 18;   // the plaza's quay across the basin
+    // the near shore: the boardwalk and its rail, the crowd strolling
+    b.box(VC.solid, '#6a4a30', -(EDGE + 3), 0.02, -CHUNK_LEN / 2, 6, 0.08, CHUNK_LEN);
+    for (let z = 0; z < CHUNK_LEN; z += 2.2) b.box(VC.metal, '#c8ccd0', -(EDGE + 6), 0.55, -z, 0.06, 1.1, 0.06);
+    b.box(VC.metal, '#c8ccd0', -(EDGE + 6), 1.1, -CHUNK_LEN / 2, 0.08, 0.08, CHUNK_LEN);
+    for (let z = 6; z < CHUNK_LEN; z += 18) K.lamp(b, -(EDGE + 1.2), -z, -1, { kind: 'lantern' });
+    K.throng(b, -(EDGE + 1), -(EDGE + 5), 1, CHUNK_LEN - 1, randi(10, 14), { mix: K.MIX.blvd });
+    K.waterPlane(b, -(EDGE + 6), -xq, 0, CHUNK_LEN, -0.8);
+    for (let z = 8; z < CHUNK_LEN; z += 16) K.refl(b, -(xq - 1), -z, '#ffd9a0', 10, -1);
+    // the plaza: its quay along the basin and along the lake's end, palms, fountains, the crowd, the Opera on it
+    K.pave(b, -(xq + 60), -CHUNK_LEN / 2, 120, CHUNK_LEN);
+    b.box(VC.solid, '#b8ac98', -(xq + 0.3), -0.4, -CHUNK_LEN / 2, 0.6, 0.9, CHUNK_LEN);
+    b.box(VC.solid, '#b8ac98', -(xq + 60), -0.4, -0.3, 120, 0.9, 0.6);
+    K.palmRow(b, -(xq + 2.4), 0, CHUNK_LEN, { step: [9, 11], lit: true });
+    for (let k = 0; k < 3; k++) { const z = -14 - k * 22; b.cyl(VC.solid, '#d8ccb4', -(xq + 8), 0.25, z, 2.2, 0.5, 'cyl'); for (let j = 0; j < 5; j++) b.add(G.cyl, VC.glowAdd, -(xq + 8) + rand(-1, 1), 1.2, z + rand(-1, 1), 0.15, 2.4, 0.15, 0, 0, 0, hdr('#d8f0ff', 0.7)); }   // the plaza's fountains
+    K.throng(b, -(xq + 4), -(xq + 20), 1, CHUNK_LEN - 1, randi(16, 22), { mix: K.MIX.blvd });
+    dubaiOpera(frame(b, -(xq + 58), 0, -41, 0.8, Math.PI / 2 - 0.2), SS);
+    K.pool(b, -(xq + 30), -41, 20, 76, hdr('#ffd9a0', 0.35));   // its light on the plaza
+    plaque(b, 'دبي أوبرا', 'DUBAI OPERA', -(xq + 1.2), 2.6, -20, -1, 5);
+    b.box(VC.solid, '#2a2622', -(xq + 160), -0.2, -CHUNK_LEN / 2, 80, 0.2, CHUNK_LEN);
+    // the right: the boulevard, the Address Sky View over it
+    farGround(b, 1, '#2a2622');
+    K.kerbLane(b, 1, 0, CHUNK_LEN, { x1: X0 + 2.6 });
+    K.jam(b, EDGE + 1.55, 0, CHUNK_LEN, 1, { fill: 0.45, mix: { lux: 3, super: 3, suv: 4, gwagon: 2, taxi: 3 } });
+    K.palmRow(b, KERB + 1.2, 0, CHUNK_LEN, { step: [9, 12], lit: true });
+    K.arabesqueRow(b, 1, 0, CHUNK_LEN);
+    K.throng(b, KERB + 2.2, X0 - 2.4, 1, CHUNK_LEN - 1, randi(14, 20), { mix: K.MIX.blvd });
+    addressSkyView(frame(b, 66, 0, -56, 0.42, -0.4), SS);
+    for (let z = 8; z < CHUNK_LEN; z += 16) K.lamp(b, KERB + 0.4, -z, 1, { kind: 'lantern' });
     return done(b);
   };
 
@@ -310,7 +347,7 @@ export function dubaiLandmarks(K) {
       goldSouk: { key: 'goldSouk', name: '黄金市场', en: 'GOLD SOUK', build: goldScene },
     },
     // the tower's LEDs in the fountain's scene fade in as the horizon's fade out (dubai.js)
-    setTowerK(k) { towerLed.uniforms.uK.value = k; },
+    setTowerK(k) { towerLed.uniforms.uK.value = k; for (const m of [towerS.metal, towerS.glow]) { m.opacity = k; m.visible = k > 0.01; } },   // (it comes and goes as the horizon's tower goes and comes)
     update(t) {
       // the fountain's show: the jets rising and falling in waves, chasing, bursting all together
       for (const { jets, spots } of waterJets) {

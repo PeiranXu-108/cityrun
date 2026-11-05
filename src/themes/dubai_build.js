@@ -18,6 +18,7 @@ export const GULF = { cHorizon: ['#e8a886'], cRose: ['#b88aa0'], cMauve: ['#6a6a
   cShallow: ['#3a8a98'], cFoam: ['#eaf4f4', 0.8], cWet: ['#6a5a48'] };
 const RIB = new THREE.TorusGeometry(1, 0.045, 4, 36, Math.PI);   // a station's rib: a half ring arching over its platforms
 export const WY = -1.4;   // the water's level (the walk is at 0)
+export const LAKE_X = 194;   // Burj Lake's far bank, across from the track (dubai.js's lake, the fountain's scene)
 const _m = new THREE.Matrix4();
 
 export function addBuildings(K) {
@@ -140,7 +141,7 @@ export function addBuildings(K) {
         const y = 1.9 + f * 3, zz = zc + u;
         if (Math.abs(zz - zc) < 1.4 && f === 0) continue;
         b.box(VC.solid, '#2a1c10', s * (x0 - 0.03), y, zz, 0.06, 1.3, 0.9);
-        if (chance(0.5)) b.add(G.plane, K.latticeGlow, s * (x0 - 0.08), y, zz, 0.9, 1.3, 1, 0, face(s), 0, hdr('#ffb860', 1.4));
+        if (chance(0.5)) b.add(G.plane, K.latticeGlow, s * (x0 - 0.08), y, zz, 0.9, 1.3, 1, 0, face(s), 0, hdr('#ffb860', 1.1));
         else for (const e of [-1, 1]) b.box(VC.solid, '#3a6a7a', s * (x0 - 0.12), y, zz + e * 0.48, 0.05, 1.3, 0.42);   // open shutters, painted
         b.box(VC.solid, '#6a4a2a', s * (x0 - 0.1), y + 0.75, zz, 0.12, 0.08, 1.1);
       }
@@ -194,7 +195,7 @@ export function addBuildings(K) {
         const y = f * 3.6 + 1.6;
         b.box(VC.solid, '#3a2a1a', s * (x0 - 0.03), y, zc + u, 0.06, 1.8, 1.1);
         b.add(G.cyl, VC.solid, s * (x0 - 0.04), y + 0.9, zc + u, 1.1, 0.06, 1.1, 0, 0, Math.PI / 2, '#3a2a1a');
-        b.add(G.plane, chance(0.45) ? K.latticeGlow : K.latticeMat, s * (x0 - 0.09), y, zc + u, 1.0, 1.7, 1, 0, face(s), 0, chance(0.45) ? hdr('#ffc070', 1.3) : '#6a4426');
+        b.add(G.plane, chance(0.45) ? K.latticeGlow : K.latticeMat, s * (x0 - 0.09), y, zc + u, 1.0, 1.7, 1, 0, face(s), 0, chance(0.45) ? hdr('#ffc070', 1.1) : '#6a4426');
       }
       b.box(VC.solid, shade(col, 1.04), cx, H + 0.35, zc, d, 0.7, L);
       for (let u = -L / 2 + 0.4; u < L / 2; u += 0.9) b.add(G.cone4, VC.solid, s * (x0 + 0.1), H + 0.95, zc + u, 0.42, 0.55, 0.2, 0, 0, 0, shade(col, 1.04));
@@ -222,7 +223,7 @@ export function addBuildings(K) {
   };
   K.tower = (b, x, z, { w = 26, d = 26, h = 140, kind = pick(['slab', 'slab', 'twist', 'step', 'spire', 'fins', 'build']), m = randi(0, 2), podium = true } = {}) => {
     const T = K.glassT[m], mat = K.glassM[m], tint = pick(['#ffffff', '#f0f4ff', '#fff4e8', '#e8f0f8']);
-    if (podium) { b.addM(buildingGeo(w + 8, 18, d + 8, T, 3.2, 4.0), mat, at(x, 0, z), '#d8d0c4'); b.box(VC.glow, hdr('#ffe8c0', 1.4), x, 2.4, z, w + 8.1, 3.6, d + 8.1); }
+    if (podium) { b.addM(buildingGeo(w + 8, 18, d + 8, T, 3.2, 4.0), mat, at(x, 0, z), '#d8d0c4'); b.box(VC.glow, hdr('#ffe8c0', 0.85), x, 2.4, z, w + 8.1, 3.6, d + 8.1); }
     const y0 = podium ? 18 : 0;
     let top = y0 + h;
     if (kind === 'twist') {   // its floors turning as it rises, a quarter turn top to bottom
@@ -230,7 +231,7 @@ export function addBuildings(K) {
       for (let i = 0; i < n; i++) b.addM(buildingGeo(w, sh, d, T, 3.2, 4.0), mat, new THREE.Matrix4().makeRotationY((i / n) * (Math.PI / 2)).setPosition(x, y0 + i * sh, z), tint);
     } else if (kind === 'step') {
       let yy = y0, ww = w, dd = d;
-      for (const f of [0.5, 0.3, 0.2]) { const hh = h * f; b.addM(buildingGeo(ww, hh, dd, T, 3.2, 4.0), mat, at(x, yy, z), tint); b.box(VC.glow, hdr('#ffe8c0', 1.8), x, yy + hh, z, ww + 0.2, 0.4, dd + 0.2); yy += hh; ww *= 0.78; dd *= 0.78; }
+      for (const f of [0.5, 0.3, 0.2]) { const hh = h * f; b.addM(buildingGeo(ww, hh, dd, T, 3.2, 4.0), mat, at(x, yy, z), tint); b.box(VC.glow, hdr('#ffe8c0', 1.3), x, yy + hh, z, ww + 0.2, 0.4, dd + 0.2); yy += hh; ww *= 0.78; dd *= 0.78; }
     } else if (kind === 'build') {   // half built: the glass stops, the bare slabs and the core go on up, the crane on top
       const hg = h * 0.55;
       b.addM(buildingGeo(w, hg, d, T, 3.2, 4.0), mat, at(x, y0, z), tint);
@@ -320,7 +321,7 @@ export function addBuildings(K) {
   K.mosque = (b, s, x, z, { w = 16, d = 14, dome = 5.5, h = 26, col = pick(['#f2ead8', '#f4f0e6', '#e8dcc4']) } = {}) => {
     b.block(VC.solid, col, x, 0, z, d, 7, w);
     b.box(VC.solid, shade(col, 0.95), x, 7.2, z, d + 0.3, 0.4, w + 0.3);
-    for (let u = -w / 2 + 1.5; u < w / 2 - 1; u += 2.4) { b.box(VC.glow, hdr('#ffd9a0', 1.5), x - s * (d / 2 + 0.03), 3.6, z + u, 0.06, 3, 1.1); b.add(G.cyl, VC.glow, x - s * (d / 2 + 0.04), 5.1, z + u, 1.1, 0.06, 1.1, 0, 0, Math.PI / 2, hdr('#ffd9a0', 1.5)); }
+    for (let u = -w / 2 + 1.5; u < w / 2 - 1; u += 2.4) { b.box(VC.glow, hdr('#ffd9a0', 1.0), x - s * (d / 2 + 0.03), 3.6, z + u, 0.06, 3, 1.1); b.add(G.cyl, VC.glow, x - s * (d / 2 + 0.04), 5.1, z + u, 1.1, 0.06, 1.1, 0, 0, Math.PI / 2, hdr('#ffd9a0', 1.5)); }
     b.add(G.cyl8, VC.solid, x, 8.4, z, dome * 1.9, 2.4, dome * 1.9, 0, Math.PI / 8, 0, col);
     b.add(HALF, VC.solid, x, 9.6, z, dome * 2, dome * 1.9, dome * 2, 0, 0, 0, shade(col, 1.03));
     b.cyl(VC.metal, '#d8b048', x, 9.6 + dome * 0.95 + 0.8, z, 0.08, 1.6, 'cyl6'); b.add(G.tor, VC.metal, x, 9.6 + dome * 0.95 + 1.8, z, 0.7, 0.7, 1, 0, Math.PI / 2, 0, '#d8b048');
@@ -349,7 +350,7 @@ export function addBuildings(K) {
     const [ar, en] = STATIONS[randi(0, STATIONS.length - 1)];
     K.bi(b, ar, en, { w: 768, h: 192, color: '#ffffff', bg: '#c8202a' }, x - s * (R + 0.3), y + 4.5, zc, 6, 1.5, 1, 0, face(s), 0);
     b.block(VC.solid, '#d8d4cc', x - s * 2, 0, zc + L / 2 - 6, 5, y, 6);   // the stair tower down to the street
-    b.box(VC.glow, hdr('#ffe8c0', 1.2), x - s * 4.55, y / 2, zc + L / 2 - 6, 0.06, y - 2, 4.6);
+    b.box(VC.glow, hdr('#ffe8c0', 0.9), x - s * 4.55, y / 2, zc + L / 2 - 6, 0.06, y - 2, 4.6);
   };
   // a train standing on the viaduct (blue and silver, the gold-class car at the front)
   K.metroTrain = (b, x, z0, z1, { y = 12.6 } = {}) => {

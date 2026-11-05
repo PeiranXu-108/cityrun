@@ -19,7 +19,7 @@ import { ledMaterial, droneShow, showClock } from './dubai_show.js';
 import { dubaiLandmarks } from './dubai_landmarks.js';
 import { dubaiCoast } from './dubai_coast.js';
 import { makeKit, KERB, X0, KUFI, SANS, MARINA_SIGNS, BLVD_SIGNS } from './dubai_kit.js';
-import { addBuildings, WY } from './dubai_build.js';
+import { addBuildings, WY, LAKE_X } from './dubai_build.js';
 
 const BLURB = '冬日傍晚的蓝调时刻：太阳刚沉进左边的海湾，沙金色的余晖还铺在水面上，天顶渐渐变成靛蓝，整座城市亮起金色的灯。谢赫扎耶德路两侧是玻璃高楼的峡谷，车流在轨道旁流淌，高架上的地铁站像一枚金色的贝壳；市中心大道两旁是阿拉伯风格的拱廊和咖啡馆，海枣树的树干缠满暖光灯串；德拉老城的双语招牌层层叠叠，卡拉克奶茶和沙威玛的香味混在出租车的车流里；香料和黄金市场在木格栅的遮棚下灯火通明，法希迪的风塔、迪拜河上往返的阿布拉、码头里的游艇和朱美拉的海滩一路排开，再往外就是起伏的红色沙丘。从迪拜相框出发，经过未来博物馆，在哈利法塔下看迪拜喷泉起舞，穿过歌剧院和运河瀑布，沿海岸经过朱美拉清真寺、阿拉伯塔、卓美亚古城、棕榈岛和亚特兰蒂斯、码头的旋转塔和迪拜之眼，到沙漠营地看坦努拉舞，再回到法希迪老城、迪拜河、香料市场和黄金市场；空中飘着金色的细沙，跑道尽头始终是哈利法塔。';
 const SIGHTS = ['迪拜相框', '未来博物馆 · 阿联酋塔', '哈利法塔 · 迪拜喷泉', '迪拜歌剧院', '迪拜水运河 · 瀑布桥', '朱美拉清真寺', '阿拉伯塔 · 朱美拉海滩', '卓美亚古城', '棕榈岛 · 亚特兰蒂斯', '迪拜码头 · 旋转塔', '迪拜之眼 · JBR', '红沙漠营地', '阿尔法希迪历史街区', '迪拜河 · 阿布拉渡口', '香料市场', '黄金市场'];
@@ -31,15 +31,17 @@ const SIGHTS = ['迪拜相框', '未来博物馆 · 阿联酋塔', '哈利法塔
 export const ROUTE = ['frame', 'future', 'fountain', 'opera', 'canal', 'jumeirahMosque', 'burjAlArab', 'madinat', 'palm', 'marina', 'ainDubai', 'desert', 'fahidi', 'creek', 'spiceSouk', 'goldSouk'];
 export const LOOP = ROUTE.length * 4;
 export const kOf = (key) => ROUTE.indexOf(key) * 4;
-// the streets either side of the landmarks that want their own (named zones, built for them alone)
-const FORCED = { [kOf('burjAlArab') - 1]: 'beach', [kOf('burjAlArab') + 1]: 'beach', [kOf('marina') - 1]: 'marina', [kOf('marina') + 1]: 'marina', [kOf('creek') - 1]: 'creek', [kOf('creek') + 1]: 'creek' };
+// the streets either side of the landmarks that want their own (named zones, built for them alone): Burj Lake runs on
+// from before the fountain, past the tower (which stands two chunks on, over the water) to the Opera at its end, so the
+// view across it is open
+const FORCED = { [kOf('fountain') - 1]: 'lake', [kOf('fountain') + 1]: 'lake', [kOf('fountain') + 2]: 'lake', [kOf('fountain') + 3]: 'lake', [kOf('burjAlArab') - 1]: 'beach', [kOf('burjAlArab') + 1]: 'beach', [kOf('marina') - 1]: 'marina', [kOf('marina') + 1]: 'marina', [kOf('ainDubai') + 1]: 'beach', [kOf('creek') - 1]: 'creek', [kOf('creek') + 1]: 'creek' };
 const ZONES = Array.from({ length: LOOP }, (_, k) => FORCED[k] || (k < kOf('jumeirahMosque') ? 'down' : k < kOf('desert') - 2 ? 'coast' : k < kOf('fahidi') ? 'desert' : 'old'));
 // the streets each part of town runs to
 const KINDS = {
   down: [['szr', 0.5], ['boulevard', 0.35], ['canal', 0.15]],
   coast: [['beach', 0.35], ['marina', 0.35], ['villa', 0.3]],
   old: [['deira', 0.35], ['souk', 0.3], ['heritage', 0.2], ['creek', 0.15]],
-  desert: [['dunes', 1]], beach: [['beach', 1]], marina: [['marina', 1]], creek: [['creek', 1]],
+  desert: [['dunes', 1]], beach: [['beach', 1]], marina: [['marina', 1]], creek: [['creek', 1]], lake: [['lake', 1]],
 };
 
 export default {
@@ -72,6 +74,39 @@ export default {
       if (chance(0.3) && (z = free())) K.hydrant(b, s * (KERB + 0.5), -z);
       if (chance(0.45) && (z = free())) K.streetPlate(b, s * (KERB + 0.4), -z, s);
       if (chance(0.25) && (z = free())) K.flagPole(b, s * (KERB + 0.8), -z);
+    };
+    // one side of Downtown's boulevard: the arabesque arcades and their cafés, palms in lights in their planters, the cars
+    const blvdSide = (b, s) => {
+      farGround(b, s, '#2a2622');
+      K.kerbLane(b, s, 0, CHUNK_LEN, { x1: X0 + 2.6 });
+      K.jam(b, lane(s), 0, CHUNK_LEN, dirOf(s), { fill: 0.45, mix: { lux: 3, super: 3, suv: 4, gwagon: 2, taxi: 3, police: 0.6, sedan: 2 } });
+      const palms = K.palmRow(b, s * (KERB + 1.2), 0, CHUNK_LEN, { step: [9, 12], lit: true });
+      for (const z of palms) b.block(VC.solid, '#d8ccb4', s * (KERB + 1.2), 0, -z, 1.6, 0.35, 1.6);   // their planters
+      K.arabesqueRow(b, s, 0, CHUNK_LEN);
+      K.backRow(b, s, { x0: 38 });
+      lamps(b, s, s * (KERB + 0.4), { kind: 'lantern' }, palms.map((p) => [p - 1.2, p + 1.2]), [14, 18]);
+      K.throng(b, s * (KERB + 2.2), s * (X0 - 2.4), 1, CHUNK_LEN - 1, randi(14, 22), { mix: K.MIX.blvd });
+      if (chance(0.35)) K.busShelter(b, s * (KERB + 2.6), -rand(12, 68), s);
+      if (chance(0.25)) K.dallah(b, s * (X0 - 3.2), -rand(20, 60), 0.8);
+      bits(b, s, palms.map((p) => [p - 1, p + 1]));
+    };
+    // Burj Lake's near shore (on the left): the boardwalk, its rail and the crowd along it, lanterns; the water out to the
+    // far bank's low lights (the fountain's scene, dubai_landmarks.js, has the same shore)
+    const lakeSide = (b, { crowd = randi(8, 14) } = {}) => {
+      b.box(VC.solid, '#6a4a30', -(EDGE + 3), 0.02, -CHUNK_LEN / 2, 6, 0.08, CHUNK_LEN);
+      for (let z = 0; z < CHUNK_LEN; z += 2.2) b.box(VC.metal, '#c8ccd0', -(EDGE + 6), 0.55, -z, 0.06, 1.1, 0.06);
+      b.box(VC.metal, '#c8ccd0', -(EDGE + 6), 1.1, -CHUNK_LEN / 2, 0.08, 0.08, CHUNK_LEN);
+      for (let k = 0; k < crowd; k++) K.person(b, -(EDGE + rand(4.4, 5.6)), -rand(2, 78), { outfit: pick(['tourist', 'tourist', 'casual', 'kandura', 'abaya']), pose: pick(['camera', 'phone', 'stand', 'stand']), ry: Math.PI / 2 + rand(-0.4, 0.4) });
+      K.throng(b, -(EDGE + 1), -(EDGE + 3.6), 1, CHUNK_LEN - 1, randi(6, 10), { mix: K.MIX.blvd });
+      for (let z = rand(4, 10); z < CHUNK_LEN; z += 18) K.lamp(b, -(EDGE + 1.2), -z, -1, { kind: 'lantern' });
+      K.waterPlane(b, -(EDGE + 6), -LAKE_X, 0, CHUNK_LEN, -0.8);
+      K.farBank(b, -1, LAKE_X, 90);
+      for (let z = rand(0, 6); z < CHUNK_LEN - 4;) {   // the far bank's low lights
+        const w = rand(10, 20), h = rand(5, 12), dep = rand(8, 12);
+        b.block(VC.solid, pick(['#d8c4a4', '#e0ccb0', '#c8b494']), -(LAKE_X + 1 + dep / 2), 0, -(z + w / 2), dep, h, w);
+        b.box(VC.glow, hdr(pick(['#ffd9a0', '#ffe8c0', '#ffc880']), 1.5), -(LAKE_X + 0.94), h * 0.45, -(z + w / 2), 0.1, h * 0.3, w * 0.8);
+        z += w + rand(2, 6);
+      }
     };
     const S = {
       // Sheikh Zayed Road: the highway on one side under its gantries, the Metro's viaduct on the other, towers both sides
@@ -106,21 +141,13 @@ export default {
         if (chance(0.35)) K.skywalk(b, -rand(20, 60));
       },
       // Downtown's boulevard: the arabesque low-rise and its arcades of cafés, palms wrapped in lights, the cars to be seen in
-      boulevard(b) {
-        for (const s of [-1, 1]) {
-          farGround(b, s, '#2a2622');
-          K.kerbLane(b, s, 0, CHUNK_LEN, { x1: X0 + 2.6 });
-          K.jam(b, lane(s), 0, CHUNK_LEN, dirOf(s), { fill: 0.45, mix: { lux: 3, super: 3, suv: 4, gwagon: 2, taxi: 3, police: 0.6, sedan: 2 } });
-          const palms = K.palmRow(b, s * (KERB + 1.2), 0, CHUNK_LEN, { step: [9, 12], lit: true });
-          for (const z of palms) b.block(VC.solid, '#d8ccb4', s * (KERB + 1.2), 0, -z, 1.6, 0.35, 1.6);   // their planters
-          K.arabesqueRow(b, s, 0, CHUNK_LEN);
-          K.backRow(b, s, { x0: 38 });
-          lamps(b, s, s * (KERB + 0.4), { kind: 'lantern' }, palms.map((p) => [p - 1.2, p + 1.2]), [14, 18]);
-          K.throng(b, s * (KERB + 2.2), s * (X0 - 2.4), 1, CHUNK_LEN - 1, randi(14, 22), { mix: K.MIX.blvd });
-          if (chance(0.35)) K.busShelter(b, s * (KERB + 2.6), -rand(12, 68), s);
-          if (chance(0.25)) K.dallah(b, s * (X0 - 3.2), -rand(20, 60), 0.8);
-          bits(b, s, palms.map((p) => [p - 1, p + 1]));
-        }
+      boulevard(b) { for (const s of [-1, 1]) blvdSide(b, s); },
+      // Burj Lake: the boardwalk on the left and the crowd at its rail, waiting for the fountain; nothing on the water but an
+      // abra or two, the far bank's lights low beyond it, so the tower stands clear across it; the Boulevard on the right
+      lake(b) {
+        lakeSide(b);
+        for (let k = randi(1, 2); k > 0; k--) K.abra(b, -rand(EDGE + 30, EDGE + 150), -0.7, -rand(8, 72), { ry: rand(0, 6) });
+        blvdSide(b, 1);
       },
       // the water canal: its promenade and joggers, the water taxis, Business Bay's towers across the water
       canal(b) {
@@ -342,7 +369,7 @@ export default {
       cWhite: hdr('#f0ecf4', 0.95), cGlass: hdr('#7a8aac', 0.9), cGlassHi: hdr('#a8b8d8', 0.95), cGlassDark: hdr('#3a4058', 1), cSteel: hdr('#c8ccd8', 0.9),
       cBand: hdr('#ffe2b0', 1.4), cTip: hdr('#ffffff', 2.4), cLobby: hdr('#ffe2b0', 1.6), cWin: hdr('#ffd9a0', 1.3), cEdge: hdr('#e8f0ff', 1.7), cRed: 0xffffff,
       cSail: hdr('#e8f0ff', 1.2), cPad: hdr('#c8ffd8', 1.4), cStone: hdr('#d8c8b0', 0.8), cGold: hdr('#f2c870', 1.25), cCrown: hdr('#ffd9a0', 1.8), cRes: hdr('#e8e2dc', 0.9),
-      cCoral: hdr('#e8a890', 0.9), cCoralHi: hdr('#f0b8a0', 0.95), cArch: hdr('#ffc880', 1.4), cWave: hdr('#5a8ac8', 1.0), cBall: hdr('#e8f0ff', 1.5), cOpera: hdr('#ffd9a0', 1.3), cGreen: hdr('#3a6a3a', 0.8), cCrane: hdr('#e8c030', 0.85),
+      cCoral: hdr('#e8a890', 0.9), cCoralHi: hdr('#f0b8a0', 0.95), cArch: hdr('#ffc880', 0.75), cWave: hdr('#5a8ac8', 1.0), cBall: hdr('#e8f0ff', 1.5), cOpera: hdr('#ffd9a0', 1.3), cGreen: hdr('#3a6a3a', 0.8), cCrane: hdr('#e8c030', 0.85),
     };
     const stex = skyTex({ wall: '#1a1c2e', lit: ['#ffe2b0', '#fff0d8', '#ffd090', '#e8f0ff', '#d8e8ff'], chance: 0.46, cols: 8, rows: 16 });
     const L = new THREE.Vector3(-0.8, 0.35, 0.5);
@@ -404,7 +431,7 @@ export default {
     });
     const wheelFar = ainDubaiWheel({ R: 118 });
     { const [x, y, z] = polarXZ(-66, 1200, -10 + 130 * 0.85); wheelFar.position.set(x, y, z); wheelFar.rotation.y = polar(-66, 1200)[2]; wheelFar.scale.setScalar(0.85); wheelFar.traverse((o) => { if (o.isMesh) o.renderOrder = -4.9; }); sky.add(wheelFar); }
-    const fAtlantis = fadeGroup((b, S2) => { atlantis(F(b, 0, 1000, 1.2, -16), S2, { lo: true }); atlantisRoyal(F(b, -10, 1080, 0.9, -16), S2); });   // in Burj Khalifa's place while the Palm is near
+    const fAtlantis = fadeGroup((b, S2) => { atlantis(F(b, 0, 900, 1.6, -16), S2, { lo: true }); atlantisRoyal(F(b, -12, 1000, 1.0, -16), S2); });   // in Burj Khalifa's place while the Palm is near, its arch at the end of the trunk
     // the Gulf on the left under the afterglow, from the shore out to the horizon (la_sea.js's far water, Dubai's colours)
     const sea = (() => {
       const RINGS = [520, 620, 740, 880, 1040, 1220, 1500], ringY = (rr) => -26 + 28 * Math.pow((rr - 520) / 980, 1.5), pos = [], idx = [], D = [];
@@ -443,7 +470,7 @@ export default {
     for (const m of SINK) m.userData.y0 = m.position.y;
     // ---------- the landmarks (dubai_landmarks.js, dubai_coast.js), in ROUTE's order ----------
     const L1 = dubaiLandmarks(K), L2 = dubaiCoast(K), byKey = { ...L1.landmarks, ...L2.landmarks };
-    const LM = { setTowerK: (k) => L1.setTowerK(k), update: (t) => { L1.update(t); L2.update(t); } };
+    const LM = { setTowerK: (k) => L1.setTowerK(k), setWheelK: (k) => L2.setWheelK(k), update: (t) => { L1.update(t); L2.update(t); } };
     // ---------- the trains ----------
     // the Metro's driverless trains standing on the line: blue and silver, the Gold Class car in front with its panoramic
     // window (no driver: the passengers look out down the line); the tram coming at you: pearl white, a band of gold dunes
@@ -506,7 +533,7 @@ export default {
       track, decor, skyline: sky, trainStyle, barrier,
       landmarks: ROUTE.map((k) => byKey[k]),
       zoneAt: (k) => (k < 0 ? 'down' : ZONES[k % LOOP]),
-      zonePool: { down: [5, 8], coast: [5, 8], old: [5, 8], desert: [3, 4], beach: [2, 3], marina: [2, 3], creek: [2, 3] },
+      zonePool: { down: [5, 8], coast: [5, 8], old: [5, 8], desert: [3, 4], beach: [2, 3], marina: [2, 3], creek: [2, 3], lake: [4, 5] },
       coinGeo: coinGeometry('dirham'), coinMat: coinMaterial('#ffd04a', '#ffa000'),
       update(t) {
         K.update(t);
@@ -514,20 +541,22 @@ export default {
         K.gulfU.uTime.value = t; K.gulfU.uSunAz.value = Math.atan2(-0.78, 1) - sky.rotation.y;
         showClock.value = t;
         LAMP.color.set('#ff2a1a').multiplyScalar(Math.sin(t * 2.4) > 0.1 ? 3.2 : 0.35);
-        // how near a landmark is: 1 from 250 m before it until its chunk is passed, easing in from 330 m and out quickly
-        // (its chunk is freed 110 m in)
-        const near = (key) => { const l = byKey[key], ch = l && l.obj && l.obj.parent; if (!ch || !ch.parent) return 0; const D = sky.position.z - ch.position.z + 40; return D > 330 || D < -60 ? 0 : D > 250 ? 1 - (D - 250) / 80 : D < -40 ? 1 - (-40 - D) / 20 : 1; };
+        // how near a landmark is: 1 from D0 (250 m) before it until its chunk is passed, easing in over R (80 m) and out
+        // quickly (its chunk is freed 110 m in)
+        const near = (key, D0 = 250, R = 80) => { const l = byKey[key], ch = l && l.obj && l.obj.parent; if (!ch || !ch.parent) return 0; const D = sky.position.z - ch.position.z + 40; return D > D0 + R || D < -60 ? 0 : D > D0 ? 1 - (D - D0) / R : D < -40 ? 1 - (-40 - D) / 20 : 1; };
         const p = ((((-sky.position.z + 7.6) / CHUNK_LEN) % LOOP) + LOOP) % LOOP;
         const win = (k0, k1, e = 1.5) => smooth(clamp((p - k0) / e, 0, 1)) * (1 - smooth(clamp((p - k1) / e, 0, 1)));
         const kD = win(kOf('desert') - 2.5, kOf('desert') + 2.5);   // out in the desert the city sinks behind the dunes
-        const kP = near('palm'), kF = near('fountain');
+        const kP = near('palm'), kF = near('fountain', 118, 20);   // (the tower across the lake comes into view as the lake opens, a chunk before the fountain)
         const kB = Math.max(0, 1 - Math.max(kF, kP));
         bkLed.uniforms.uK.value = kB; for (const m of bkFar.mats) m.opacity = kB;
         bkFar.g.visible = kB > 0.01;
         LM.setTowerK(kF);
-        fFrame.set(1 - near('frame')); fEmirates.set(1 - near('future')); fArab.set(1 - near('burjAlArab')); fMarina.set(1 - Math.max(near('marina'), near('ainDubai'))); fAtlantis.set(kP);
+        const kA = near('ainDubai');
+        LM.setWheelK(kA);
+        fFrame.set(1 - near('frame')); fEmirates.set(1 - near('future')); fArab.set(1 - near('burjAlArab')); fMarina.set(1 - Math.max(near('marina'), kA)); fAtlantis.set(kP);
         wheelFar.visible = fMarina.k > 0.01; wheelFar.rotation.z = t * 0.02; wheelFar.userData.rim.color.setHSL((t * 0.04) % 1, 0.8, 0.6).multiplyScalar(1.6);
-        const yS = -150 * kD;
+        const yS = -220 * kD;   // (only Burj Khalifa's top is left glittering over the dunes, far off down the track)
         if (sky.userData.y !== yS) { sky.userData.y = yS; for (const m of SINK) m.position.y = m.userData.y0 + yS; }
         stars.visible = kD > 0.01; stars.material.opacity = kD;
         drones.userData.update(t, 1 - kD);

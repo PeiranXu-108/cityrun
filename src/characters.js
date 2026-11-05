@@ -46,6 +46,7 @@ FLAG.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, -0.3
 FLAG.computeVertexNormals();
 const EAR = new THREE.ConeGeometry(0.5, 1, 4);
 const TOR = new THREE.TorusGeometry(0.5, 0.12, 8, 28);
+const CORD = new THREE.TorusGeometry(0.5, 0.06, 6, 28);
 
 const RB = new RoundedBoxGeometry(1, 1, 1, 2, 0.22);
 const BOX = new THREE.BoxGeometry(1, 1, 1);
@@ -377,11 +378,11 @@ export function buildCharacter(d) {
     for (const sx of [-1, 1]) part(BOX, M(d.hair, 0.6), sx * 0.075, 0.27, -0.152, 0.06, 0.018, 0.01, head);   // and eyebrows
   } else if (falconer) {
     const cloth = M(d.hat, 0.85), cord = M('#141414', 0.6);
-    part(RB, cloth, 0, 0.29, 0.01, 0.37, 0.2, 0.35, head);                          // the ghutra over the crown
+    part(RB, cloth, 0, 0.305, 0.01, 0.37, 0.22, 0.35, head);                        // the ghutra over the crown
     part(BOX, cloth, 0, 0.32, -0.158, 0.35, 0.05, 0.02, head);                       // its edge across the brow
     for (const sx of [-1, 1]) part(BOX, cloth, sx * 0.178, 0.13, 0.02, 0.035, 0.36, 0.31, head);   // falling either side of the face
     part(BOX, cloth, 0, 0.06, 0.165, 0.38, 0.5, 0.04, head);                         // and down the back to the shoulders
-    for (const [y, k] of [[0.37, 0.37], [0.4, 0.35]]) part(TOR, cord, 0, y, 0.01, k, k, 0.42, head).rotation.x = Math.PI / 2;   // the agal
+    for (const y of [0.335, 0.38]) part(CORD, cord, 0, y, 0.01, 0.4, 0.4, 0.4, head).rotation.x = Math.PI / 2;   // the agal: two black cords round the crown
     for (const sx of [-1, 1]) part(BOX, M(d.hair, 0.6), sx * 0.07, 0.25, -0.152, 0.07, 0.016, 0.01, head);   // eyebrows
   } else if (swan) {
     part(RB, M(d.hair, 0.7), 0, 0.27, 0.03, 0.34, 0.16, 0.33, head);                  // hair drawn back smooth

@@ -97,8 +97,9 @@ export function dubaiCoast(K) {
     K.sand(b, -(X0 + 92), -CHUNK_LEN / 2, 56, CHUNK_LEN, 0.04, '#e0c8a8');   // a frond, its villas
     for (let z = 0; z < CHUNK_LEN; z += 6) for (let k = 0; k < 3; k++) { const x = -(X0 + 70 + k * 18), zz = -z - rand(0, 4); b.block(VC.solid, '#f4ece0', x, 0, zz, 8, rand(5, 8), 5); b.box(VC.glow, hdr('#ffd9a0', 1.3), x + 4.02, 2.5, zz, 0.05, 1.4, 3); }   // the fronds' villas
     // the monorail's viaduct, 8 m up, over the right-hand road
-    b.box(VC.solid, '#e8e4dc', X0 + 2, 8, -CHUNK_LEN / 2, 2.2, 1.6, CHUNK_LEN);
-    for (let z = 10; z < CHUNK_LEN; z += 24) b.block(VC.solid, '#dcd8d0', X0 + 2, 0, -z, 1.4, 7.2, 1.4);
+    b.box(VC.solid, '#b8b4ac', X0 + 2, 8, -CHUNK_LEN / 2, 2.2, 1.6, CHUNK_LEN);
+    b.box(VC.glow, hdr('#bfe6ff', 1.4), X0 + 2 - 1.12, 8.3, -CHUNK_LEN / 2, 0.06, 0.12, CHUNK_LEN);   // its line of light along the side
+    for (let z = 10; z < CHUNK_LEN; z += 24) { b.block(VC.solid, '#a8a49c', X0 + 2, 0, -z, 1.4, 7.2, 1.4); b.block(VC.solid, '#b8b4ac', X0 + 2, 6.6, -z, 3.2, 0.6, 2); }
     const train = new THREE.Group(); for (const m of monoGeo.children) train.add(new THREE.Mesh(m.geometry, m.material)); train.traverse((o) => (o.frustumCulled = false));
     moving.push([train, (t) => { train.position.set(X0 + 2, 9.2, 40 - ((t * 9) % 200)); }]);
     plaque(b, 'نخلة جميرا', 'PALM JUMEIRAH', KERB + 0.6, 2.6, -16, 1, 4.6);
@@ -135,17 +136,27 @@ export function dubaiCoast(K) {
   };
 
   // ---------- Ain Dubai and JBR ----------
-  const wheel = ainDubaiWheel({ R: 118, curve: (o) => basic({ ...o }) });
+  // the wheel stands out on Bluewaters ahead and to the left, turned toward the runner coming up the beach, unfogged: it fades
+  // in as the horizon's wheel fades out (dubai.js); the beach chunk after the scene keeps the sea open under it
+  const wheelMats = [];
+  const wheelMat = (o) => { const m = basic({ fog: false, transparent: true, ...o }); wheelMats.push(m); return m; };
+  const wheel = ainDubaiWheel({ R: 118, curve: wheelMat });
+  const legs = wheelMat({ vertexColors: true });
+  let wheelGrp = null;
   const ainScene = () => {
-    const b = new Batcher(), s0 = 0.55, wx = -130, wz = -92;
+    const b = new Batcher(), s0 = 0.55, wx = -118, wz = -124, wry = 0.7, wy = SEA + 0.6;
     K.pave(b, -(EDGE + 3.5), -CHUNK_LEN / 2, 7, CHUNK_LEN);
     K.beach(b);
-    K.sand(b, wx, wz, 90, 90, SEA + 0.6, '#e0c8a8');   // Bluewaters
-    ainDubaiLegs(frame(b, wx, SEA + 0.6, wz, s0, Math.PI / 2), SS);
-    for (let k = 0; k < 6; k++) b.addM(buildingGeo(14, rand(8, 16), 20, K.res, 3.0, 3.2), K.resMat, at(wx + rand(-35, 35), SEA + 0.6, wz + rand(-35, 35)), '#f4ece0');
-    for (let x = -(EDGE + 24); x > wx + 40; x -= 6) { b.box(VC.solid, '#d8d4cc', x, 3, -40, 6.2, 0.6, 7); b.box(VC.glow, hdr('#bfe6ff', 1.8), x, 3.35, -36.4, 6, 0.1, 0.1); }   // the bridge out to the island
+    K.sand(b, wx, wz, 70, 70, wy, '#e0c8a8');   // Bluewaters
+    ainDubaiLegs(frame(b, wx, wy, wz, s0, wry), { ...SS, wall: legs, cWhite: hdr('#d8d4e0', 0.85) });
+    for (let k = 0; k < 6; k++) b.addM(buildingGeo(14, rand(8, 16), 20, K.res, 3.0, 3.2), K.resMat, at(wx + rand(-28, 28), wy, wz + rand(-28, 28)), '#f4ece0');
+    { const x0 = -(EDGE + 20), z0 = -56, x1 = wx + 30, z1 = wz + 30, len = Math.hypot(x1 - x0, z1 - z0), ry = Math.atan2(-(z1 - z0), x1 - x0), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;   // the bridge out to the island
+      b.add(G.box, VC.solid, cx, 3, cz, len, 0.6, 7, 0, ry, 0, '#d8d4cc');
+      for (const e of [-1, 1]) b.add(G.box, VC.glow, cx - Math.sin(ry) * e * 3.6, 3.4, cz - Math.cos(ry) * e * 3.6, len, 0.1, 0.1, 0, ry, 0, hdr('#bfe6ff', 1.8));
+      for (let k = 1; k < 6; k++) { const f = k / 6; b.box(VC.solid, '#c8c4bc', x0 + (x1 - x0) * f, (SEA + 3) / 2, z0 + (z1 - z0) * f, 1.6, 3 - SEA, 1.6); } }
     const g = new THREE.Group(); for (const m of wheel.children) g.add(new THREE.Mesh(m.geometry, m.material));
-    g.position.set(wx, SEA + 0.6 + 130 * s0, wz); g.rotation.y = Math.PI / 2; g.scale.setScalar(s0); g.traverse((o) => (o.frustumCulled = false));
+    g.position.set(wx, wy + 130 * s0, wz); g.rotation.y = wry; g.scale.setScalar(s0); g.traverse((o) => (o.frustumCulled = false));
+    wheelGrp = g;
     moving.push([g, (t) => { g.rotation.z = t * 0.03; }]);
     for (let z = 4; z < CHUNK_LEN; z += 14) K.datePalm(b, -(EDGE + 1.6), -z, rand(0.85, 1.0));
     farGround(b, 1, '#24201c');
@@ -217,6 +228,7 @@ export function dubaiCoast(K) {
       ainDubai: { key: 'ainDubai', name: '迪拜之眼 · JBR', en: 'AIN DUBAI · JBR', build: ainScene },
       desert: { key: 'desert', name: '红沙漠营地', en: 'DESERT CAMP', build: desertScene },
     },
+    setWheelK(k) { for (const m of wheelMats) m.opacity = k; if (wheelGrp) wheelGrp.visible = k > 0.01; },
     update(t) {
       sailCol.setHSL((t * 0.035) % 1, 0.55, 0.62).multiplyScalar(1.5);   // Burj Al Arab's sail washing slowly through the colours
       wheel.userData.rim.color.setHSL((t * 0.04) % 1, 0.8, 0.6).multiplyScalar(1.8);
