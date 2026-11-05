@@ -635,6 +635,40 @@ class Engine {
     for (const [f, d] of [[3150, 0.35], [5240, 0.22], [7900, 0.12]]) { const g = this.gain(out); this.env(g, t, 0.001, v, d); this.osc('sine', f * (0.99 + Math.random() * 0.02), t, d, g); }
   }
 
+  // ---------- Dubai: the oud, the tabl, a Khaleeji band's handclaps; the tram's horn ----------
+  // the oud: a fretless lute, its doubled gut courses struck with an eagle-feather risha, deep and woody, sliding into the
+  // note (fractional MIDI for the maqam's quarter tones); trem: the risha's tremolo, the note struck over and over
+  oud(t, m, dur = 0.4, v = 0.07, { trem = false, out = this.music } = {}) {
+    const f0 = mtof(m), step = 0.052, hits = trem ? Math.max(1, Math.floor(dur / step)) : 1;
+    for (let i = 0; i < hits; i++) {
+      const tt = t + i * step, d = trem ? Math.min(0.2, dur - i * step + 0.06) : dur, vv = v * (i ? 0.5 + 0.2 * Math.sin(i * 1.7) : 1);
+      const g = this.gain(out); this.env(g, tt, 0.002, vv, d);
+      if (out === this.music) g.connect(this.send);
+      const body = this.filt('lowpass', 2600, 1.2, g);
+      body.frequency.setValueAtTime(2900, tt); body.frequency.exponentialRampToValueAtTime(620, tt + Math.min(d, 0.32));
+      for (const det of [0.997, 1.003]) { const o = this.osc('sawtooth', f0 * det * (i ? 1 : 0.972), tt, d, body); if (!i) o.frequency.exponentialRampToValueAtTime(f0 * det, tt + 0.045); }
+      this.osc('triangle', f0 / 2, tt, d * 0.8, this.filt('lowpass', 480, 0.8, this.gain(g, 0.45)));   // the deep bowl of its back
+      const gk = this.gain(out); this.env(gk, tt, 0.001, vv * 0.35, 0.012); this.noiseSrc(tt, 0.02, this.filt('bandpass', 2400, 1.2, gk));   // the feather on the string
+    }
+  }
+  tabl(t, v = 0.3, out = this.music) {   // the tabl: the big double-headed drum of the Gulf's bands, a deep round boom and the stick's slap
+    const g = this.gain(out); this.env(g, t, 0.002, v, 0.42);
+    const o = this.osc('sine', 118, t, 0.46, g); o.frequency.exponentialRampToValueAtTime(46, t + 0.24);
+    const g2 = this.gain(out); this.env(g2, t, 0.001, v * 0.4, 0.06); this.noiseSrc(t, 0.07, this.filt('lowpass', 520, 0.9, g2));
+  }
+  khaleejiClap(t, v = 0.12, out = this.music) {   // a row of men clapping together, never quite at once: five claps spread over a few milliseconds
+    for (let k = 0; k < 5; k++) {
+      const tt = t + Math.random() * 0.016, g = this.gain(out); this.env(g, tt, 0.001, v * (0.6 + Math.random() * 0.4), 0.05 + Math.random() * 0.03);
+      this.noiseSrc(tt, 0.09, this.filt('bandpass', 1050 + Math.random() * 700, 1.1, g));
+    }
+    if (out === this.music) { const gs = this.gain(this.send); this.env(gs, t, 0.001, v * 0.35, 0.08); this.noiseSrc(t, 0.1, this.filt('bandpass', 1300, 0.9, gs)); }
+  }
+  tramHornAt(t, dur = 0.42, v = 0.07, out = this.sfx) {   // the Dubai tram's horn: a soft electronic two-tone, a major third
+    const g = this.gain(out); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.03); g.gain.setValueAtTime(v, t + dur * 0.8); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    const f = this.filt('bandpass', 1300, 0.7, g);
+    for (const fr of [587, 740]) { this.osc('square', fr, t, dur, f); this.osc('sine', fr, t, dur, this.gain(g, 0.6)); }
+  }
+
   // ---------- Moscow: the balalaika and the bayan, the wooden spoons, the bass choir; an elektrichka's horn ----------
   balalaika(t, m, dur = 0.22, v = 0.07) {   // a bright, thin pluck from the little triangular body, quick to die
     const g = this.gain(this.music); this.env(g, t, 0.001, v, dur); g.connect(this.send);
@@ -980,6 +1014,22 @@ class Engine {
   }
   // an old Red Car coming down the line: two blasts on its air whistle, then the gong
   redCar() { this.fx((t) => { this.airHorn(t, 0.42, 0.07); this.airHorn(t + 0.58, 0.95, 0.07); [1.75, 1.95, 2.3].forEach((d) => this.gongAt(t + d, 0.1)); }); }
+  // Dubai: an oud running up the Bayati scale over a darbuka roll, its top note trembling under the risha; a kanun sweeping
+  // down into the chord, the oud's low strings and a zil
+  majlis() {
+    this.fx((t) => {
+      const o = this.sfx;
+      [62, 63.5, 65, 67, 69, 70, 72].forEach((m, i) => this.oud(t + i * 0.085, m, 0.22, 0.09, { out: o }));
+      this.oud(t + 0.6, 74, 0.8, 0.085, { trem: true, out: o });
+      for (let k = 0; k < 9; k++) this.darbuka(t + 0.04 + k * 0.068, k % 2 ? 'k' : 'T', 0.05 + k * 0.013, o);
+      this.darbuka(t + 0.66, 'D', 0.26, o);
+      [86, 84, 81, 79, 77, 74, 72, 69, 65, 62].forEach((m, i) => this.tone(t + 1.42 + i * 0.045, 'triangle', mtof(m), mtof(m), 0.55, 0.05, o));
+      [50, 57, 62].forEach((m) => this.oud(t + 1.9, m, 1.1, 0.08, { out: o }));
+      this.zil(t + 1.9, 0.07, o); this.darbuka(t + 1.9, 'D', 0.22, o);
+    });
+  }
+  // the Dubai tram coming down the line: two notes on its horn, a short and a long
+  tramHorn() { this.fx((t) => { this.tramHornAt(t, 0.36); this.tramHornAt(t + 0.5, 0.75); }); }
   chime() { this.fx((t) => [1047, 1319, 1568, 2093].forEach((f, i) => this.tone(t + i * 0.09, 'sine', f, f, 0.5, 0.08))); }
   beep(hi = false) { this.fx((t) => this.tone(t, 'square', hi ? 1320 : 880, hi ? 1320 : 880, 0.12, 0.07)); }
   jetStart() { this.fx((t) => { this.whoosh(t, 150, 1800, 0.8, 0.4, 0.7); this.tone(t, 'sawtooth', 60, 140, 0.6, 0.1); }); }
@@ -1157,7 +1207,66 @@ const LA_BASS = [[0, 0, 3], [3, 12, 1], [6, 0, 2], [10, 7, 2], [12, 10, 2], [14,
 const LA_A = [[0, 84, 6], [6, 82, 2], [8, 80, 4], [12, 79, 4], [16, 82, 3], [19, 84, 1], [20, 86, 6], [28, 84, 4]];
 const LA_B = [[0, 87, 8], [8, 86, 2], [10, 84, 2], [12, 82, 4], [16, 79, 6], [22, 80, 2], [24, 82, 8]];
 const LA_TALK = [[0, 72, 2], [2, 75, 2], [4, 77, 4], [8, 75, 2], [10, 72, 5], [16, 70, 2], [18, 72, 2], [20, 75, 6], [28, 72, 4]];
+// Dubai: Gulf pop (khaleeji) gone trap, 100 BPM with a lazy shuffle, in maqam Bayati on D (D E½♭ F G A B♭ C: the second
+// degree a quarter tone flat, MIDI 63.5 / 75.5). The oud alone first, a taqsim over the drone, the kanun rippling in; then
+// the khaleeji groove: the tabl's boom, the darbuka, the row of men clapping off the beat, the bass, the oud's riff; the
+// drop under the 808 kick and the trap hats, the kanun taking the tune; the ney sings it over the groove with the zils;
+// the last half bar is the claps alone, the darbuka rolling up into the top. Dm - Gm - C - Dm.
+const DXB_ROOT = [38, 43, 36, 38];
+const DXB_CH = [[62, 65, 69], [62, 67, 70], [60, 64, 67], [62, 65, 69]];
+const DXB_TAQSIM = [[0, 62, 4], [4, 63.5, 2], [6, 65, 2], [8, 67, 6], [14, 65, 2], [16, 63.5, 4], [20, 62, 4], [24, 69, 8], [32, 70, 4], [36, 69, 2], [38, 67, 2], [40, 65, 4], [44, 63.5, 4], [48, 62, 12], [60, 57, 4]];   // over four bars
+const DXB_RIFF = [[0, 62, 2], [2, 63.5, 1], [3, 65, 1], [4, 67, 2], [6, 65, 1], [7, 63.5, 1], [8, 62, 3], [11, 60, 1], [12, 62, 2], [14, 65, 2], [16, 67, 2], [18, 69, 1], [19, 70, 1], [20, 69, 2], [22, 67, 2], [24, 65, 2], [26, 63.5, 2], [28, 62, 4]];
+const DXB_A = [[0, 74, 2], [2, 74, 1], [3, 75.5, 1], [4, 77, 2], [6, 75.5, 2], [8, 74, 3], [11, 72, 1], [12, 74, 4], [16, 77, 2], [18, 79, 1], [19, 77, 1], [20, 75.5, 2], [22, 74, 2], [24, 72, 2], [26, 70, 2], [28, 69, 4]];
+const DXB_B = [[0, 69, 2], [2, 70, 2], [4, 72, 2], [6, 74, 2], [8, 75.5, 3], [11, 74, 1], [12, 72, 4], [16, 74, 2], [18, 72, 1], [19, 70, 1], [20, 69, 4], [24, 67, 2], [26, 69, 2], [28, 62, 4]];
+const DXB_CLAP = [3, 6, 10, 11, 14];   // the claps' figure through a bar, off the beat
+const DXB_DARB = { 0: 'D', 4: 'T', 6: 'k', 9: 'k', 12: 'T', 14: 'k', 15: 'k' };
+const DXB_TABL = [0, 7, 8];
+const DXB_BASS = [[0, 0, 3], [3, 0, 1], [7, 0, 2], [8, 7, 3], [12, 12, 2], [14, 10, 2]];   // [step, interval over the root, length]
 const SONGS = {
+  dubai: {
+    bpm: 100, swing: 0.1,
+    step(e, s, bar, t, dt) {
+      const B = bar % 16, sec = Math.floor(B / 4), c = bar % 4, ch = DXB_CH[c], r = DXB_ROOT[c], brk = B === 15 && s >= 8, off = (c % 2) * 16;
+      // the taqsim: the oud alone over a drone, its long notes trembling under the risha; the darbuka and the kanun join
+      if (sec === 0) {
+        const n = (B % 4) * 16 + s;
+        for (const [st, m, len] of DXB_TAQSIM) if (st === n) e.oud(t, m, dt * len * 0.95, 0.085, { trem: len >= 4 });
+        if (s === 0) { e.pad(t, [50, 57], dt * 16, 0.024); if (B === 0) e.zil(t, 0.05); }
+        if (B >= 1 && (s === 0 || s === 8)) e.darbuka(t, 'D', 0.18);
+        if (B >= 2 && s % 2 === 0) e.kanun(t, ch[(s / 2) % 3] + 12, dt * 3, 0.026);
+      }
+      // the khaleeji groove: the tabl, the darbuka, the claps off the beat, the bass; the oud's riff (an octave up in the drop)
+      if (sec >= 1 && !brk) {
+        if (DXB_TABL.includes(s)) e.tabl(t, s === 0 ? 0.34 : 0.26);
+        const k = DXB_DARB[s];
+        if (k) e.darbuka(t, k, k === 'D' ? 0.2 : k === 'T' ? 0.16 : 0.08);
+        if (DXB_CLAP.includes(s)) e.khaleejiClap(t, sec === 2 ? 0.1 : 0.12);
+        for (const [st, iv, len] of DXB_BASS) if (st === s) e.sub(t, r + iv, dt * len * 0.95, sec === 2 ? 0.38 : 0.3);
+        if (s === 0) e.pad(t, ch, dt * 16, sec === 2 ? 0.012 : 0.018);
+        if (sec !== 3) for (const [st, m, len] of DXB_RIFF) if (st === s + off) e.oud(t, sec === 2 ? m + 12 : m, dt * len * 0.9, 0.075);
+      }
+      // the drop: the 808's kick and the trap hats with their rolls, the kanun singing the tune
+      if (sec === 2 && !brk) {
+        if (s === 0 || s === 10 || (s === 7 && c % 2)) e.kick(t, 0.85);
+        e.hat(t, s % 2 ? 0.02 : 0.045);
+        if ((s === 6 || s === 14) && c % 2) { e.hat(t + dt / 3, 0.035); e.hat(t + (2 * dt) / 3, 0.035); }
+        for (const [st, m, len] of c < 2 ? DXB_A : DXB_B) if (st === s + off) e.kanun(t, m, dt * len * 0.9, 0.05);
+      }
+      // the ney sings the tune over the groove, the kanun's arpeggios under it, the zils
+      if (sec === 3 && !brk) {
+        for (const [st, m, len] of c < 2 ? DXB_A : DXB_B) if (st === s + off) e.ney(t, m, dt * len * 0.95, 0.075);
+        if (s % 2 === 0) e.kanun(t, ch[[0, 1, 2, 1][(s / 2) % 4]] + 12, dt * 2.5, 0.028);
+        if (s === 6 || s === 14) e.zil(t, 0.04);
+        e.hat(t, s % 4 === 2 ? 0.035 : 0.012);
+      }
+      // the turn: the claps alone, the darbuka rolling up into the top of the cycle
+      if (brk) {
+        if (s % 2 === 0 || s === 15) e.khaleejiClap(t, 0.13);
+        e.darbuka(t, s % 2 ? 'k' : 'T', 0.06 + (s - 8) * 0.025);
+        if (s === 15) e.zil(t, 0.06);
+      }
+    },
+  },
   la: {
     bpm: 94, swing: 0.14, gain: 1.24,
     step(e, s, bar, t, dt) {

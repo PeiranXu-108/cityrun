@@ -38,9 +38,10 @@ import ist from "./themes/istanbul.js";
 import msk from "./themes/moscow.js";
 import sf from "./themes/sf.js";
 import la from "./themes/la.js";
+import dubai from "./themes/dubai.js";
 
-export const THEMES = { ny, pgh, hz, bj, tokyo, syd, ldn, lj, paris, hk, taipei, ist, msk, sf, la };
-export const THEME_ORDER = ["ny", "pgh", "hz", "bj", "tokyo", "syd", "ldn", "lj", "paris", "hk", "taipei", "ist", "msk", "sf", "la"];
+export const THEMES = { ny, pgh, hz, bj, tokyo, syd, ldn, lj, paris, hk, taipei, ist, msk, sf, la, dubai };
+export const THEME_ORDER = ["ny", "pgh", "hz", "bj", "tokyo", "syd", "ldn", "lj", "paris", "hk", "taipei", "ist", "msk", "sf", "la", "dubai"];
 export const TOUR_LEN = CHUNK_LEN * 15;
 // The World Tour visits every city once in a random order, then shuffles again; never the same city twice in a row.
 function tourOrder(prev) {
