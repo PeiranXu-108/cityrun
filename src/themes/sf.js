@@ -32,7 +32,7 @@ const SKY = {
 const GGS = { ...SKY, paint: skyMat({ transparent: true }), cOrange: hdr('#d2644a', 0.92), cOrange2: hdr('#bc543e', 0.92), cDeck: hdr('#a8503e', 0.9) };
 const LAMP = skyMat();   // aircraft lamps on the towers, blinking
 const GGLAMP = skyMat({ transparent: true });   // the far Golden Gate's lamps (they fade out with it)
-const RIDGE = skyMat();   // the hills' ring (its geometry has no normals, so it keeps a material of its own)
+const RIDGE = skyMat({ side: THREE.DoubleSide });   // the hills' ring (its geometry has no normals, so it keeps a material of its own; its faces look outward, so both sides are drawn)
 const bayLights = [];
 // the icons that stand clear of the ring of houses: [degrees, radius]
 const ICONS = [[0, 1250], [-32, 980], [-45, 1060], [9, 640], [15.5, 900], [30, 860]];
@@ -307,46 +307,36 @@ export default {
     const fSign = K.label('F MARKET & WHARVES', { w: 512, h: 96, color: '#ffb02a', bg: '#141414', font: SANS, weight: 700, size: 0.6, k: 1.4 });
     const pcc = (b, c) => {
       if (c.idx === 0) liv = pick(LIVERY);
-      const zc = c.zb0 - c.bl / 2;
+      const zc = c.zb0 - c.bl / 2, hw = TRAIN_W / 2;
       for (const e of [-1, 1]) {
-        b.box(VC.solid, liv[0], e * (TRAIN_W / 2 + 0.008), 0.95, zc, 0.02, 1.0, c.bl - 0.2);   // the lower body in the city's colour
-        b.box(VC.solid, liv[0], e * (TRAIN_W / 2 + 0.008), 2.82, zc, 0.02, 0.32, c.bl - 0.2);   // the letterboard
-        b.box(VC.solid, liv[2], e * (TRAIN_W / 2 + 0.012), 1.5, zc, 0.02, 0.08, c.bl - 0.3);   // the belt rail
+        b.box(VC.solid, liv[0], e * (hw + 0.008), 0.95, zc, 0.02, 1.0, c.bl - 0.2);   // the lower body in the city's colour
+        b.box(VC.solid, liv[0], e * (hw + 0.008), 2.82, zc, 0.02, 0.32, c.bl - 0.2);   // the band over the windows, its little standee windows
+        for (let z = c.zb0 - 0.7; z > c.zb0 - c.bl + 0.6; z -= 0.72) b.box(VC.glow, hdr('#3a4658', 1), e * (hw + 0.02), 2.82, z, 0.01, 0.15, 0.46);
+        b.box(VC.solid, liv[2], e * (hw + 0.012), 1.5, zc, 0.02, 0.08, c.bl - 0.3);   // the belt rail
+        b.box(VC.metal, '#c8ccd2', e * (hw + 0.014), 0.5, zc, 0.02, 0.05, c.bl - 0.3);   // the chrome along the skirt
       }
       b.box(VC.solid, liv[1], 0, TRAIN_H - 0.08, zc, TRAIN_W - 0.34, 0.1, c.bl - 0.3);
-      beam(b, VC.metal, 0, TRAIN_H + 0.12, c.zb0 - c.bl + 1.4, 0, TRAIN_H + 0.42, c.zb0 - 2.6, 0.06, '#2a2a2e');   // the trolley pole, hooked down
-      b.box(VC.metal, '#2a2a2e', 0, TRAIN_H + 0.12, c.zb0 - c.bl + 1.4, 0.3, 0.2, 0.3);
-      if (!c.front) return;
-      b.add(G.sph, VC.solid, 0, 0.98, c.z0 - 0.12, TRAIN_W - 0.06, 1.36, 0.64, 0, 0, 0, liv[0]);   // the streamlined nose, under the windscreen
-      b.cyl(VC.glow, hdr('#fff4dc', 6), 0, 1.08, c.z0 + 0.2, 0.2, 0.06, 'cyl', Math.PI / 2);   // its single headlamp
-      b.add(G.plane, fSign, 0, 3.0, c.z0 + 0.03, 1.5, 0.28, 1);
-    };
-    const cableExtra = (b, c) => {   // the cable car on the train's body: open benches in front, the closed cabin behind
-      const zc = c.zb0 - c.bl / 2, g0 = c.z0 - 0.25, g1 = c.z0 - 4.0;
-      for (const e of [-1, 1]) {
-        const x = e * (TRAIN_W / 2);
-        b.box(VC.solid, '#1e1612', x + e * 0.01, 2.25, (g0 + g1) / 2, 0.02, 1.5, g0 - g1);   // the open side: the dark under its roof
-        b.box(VC.solid, '#a8743a', x + e * 0.22, 1.45, (g0 + g1) / 2, 0.42, 0.08, g0 - g1);   // the bench facing out
-        for (let z = g0 - 0.5; z > g1 + 0.2; z -= 0.95) {
-          b.cyl(VC.metal, '#c8a050', x + e * 0.02, 2.25, z, 0.035, 1.5, 'cyl6');   // brass stanchions
-          if (chance(0.7)) K.person(b, x + e * 0.32, z + 0.4, { seated: true, y: 0.62, ry: e > 0 ? -Math.PI / 2 : Math.PI / 2, bag: false, phone: false, camera: chance(0.3) });
-        }
-        b.box(VC.solid, '#6a4a2a', x + e * 0.3, 0.55, zc, 0.4, 0.08, c.bl - 0.6);   // the running board
-        if (chance(0.6)) K.person(b, x + e * 0.42, c.zb0 - c.bl + 2.4, { y: 0.6, ry: e > 0 ? -Math.PI / 2 : Math.PI / 2, s: 0.95, bag: false, phone: false });
-        for (let z = g1 - 0.6; z > c.zb0 - c.bl + 0.8; z -= 1.15) b.box(VC.glow, hdr('#ffe0a8', 1.0), x + e * 0.012, 2.2, z, 0.03, 0.85, 0.8);   // the cabin's windows
-        b.box(VC.solid, '#efe4c8', x + e * 0.008, 2.85, zc, 0.02, 0.32, c.bl - 0.2);
-        for (const y of [0.72, 1.38]) b.box(VC.solid, '#d8b048', x + e * 0.014, y, zc, 0.02, 0.06, c.bl - 0.2);
+      for (const [x, zp, zt] of [[-0.18, c.zb0 - c.bl + 1.4, c.zb0 - 2.6], [0.18, c.zb0 - 1.4, c.zb0 - c.bl + 2.6]]) {   // a trolley pole at each end, hooked down along the roof
+        beam(b, VC.metal, x, TRAIN_H + 0.12, zp, x, TRAIN_H + 0.36, zt, 0.06, '#2a2a2e');
+        b.box(VC.metal, '#2a2a2e', x, TRAIN_H + 0.12, zp, 0.3, 0.2, 0.3);
       }
-      b.box(VC.solid, '#f2ece0', 0, TRAIN_H + 0.1, zc, TRAIN_W - 1.0, 0.22, c.bl - 1.4);   // the clerestory
       if (!c.front) return;
-      b.add(G.plane, K.label('POWELL & HYDE', { w: 512, h: 96, color: '#1a1a24', bg: '#f4f0e4', font: SANS, weight: 700, size: 0.62, k: 1.0 }), 0, 3.05, c.z0 + 0.04, 1.8, 0.34, 1);
-      b.box(VC.solid, '#7a1a24', 0, 0.78, c.z0 + 0.075, TRAIN_W - 0.06, 0.7, 0.03);   // the dash, over the stock lamps: a cable car has one
-      b.cyl(VC.glow, hdr('#fff0c8', 6.5), 0, 1.25, c.z0 + 0.1, 0.22, 0.06, 'cyl', Math.PI / 2);
-      b.sph(VC.metal, '#d8b048', 0, 2.75, c.z0 - 1.2, 0.22);   // the bell
+      const z0 = c.z0, ny = 0.98, nr = [hw - 0.03, 0.68, 0.32], nz = z0 - 0.12, onNose = (x, y) => nz + nr[2] * Math.sqrt(Math.max(0, 1 - (x / nr[0]) ** 2 - ((y - ny) / nr[1]) ** 2));
+      b.add(G.sph, VC.solid, 0, ny, nz, nr[0] * 2, nr[1] * 2, nr[2] * 2, 0, 0, 0, liv[0]);   // the streamlined nose under the windscreen
+      for (const y of [0.72, 0.84, 0.96]) for (let k = 0; k < 8; k++) {   // its chrome whiskers, swept up across it
+        const xa = -0.9 + (k * 1.8) / 8, xb = xa + 1.8 / 8, ya = y + Math.abs(xa) * 0.25, yb = y + Math.abs(xb) * 0.25;
+        beam(b, VC.metal, xa, ya, onNose(xa, ya) + 0.012, xb, yb, onNose(xb, yb) + 0.012, 0.025, '#e8eaec');
+      }
+      b.cyl(VC.glow, hdr('#fff4dc', 6), 0, 1.12, onNose(0, 1.12) + 0.02, 0.2, 0.06, 'cyl', Math.PI / 2);   // its single headlamp
+      b.box(VC.solid, '#1e2026', 0, 0.42, onNose(0, 0.42) + 0.07, TRAIN_W - 0.3, 0.14, 0.14);   // the bumper
+      for (const e of [-1, 1]) b.box(VC.solid, liv[1], e * 0.4, 2.4, z0 + 0.03, 0.08, 0.92, 0.02);   // the windscreen in three panes
+      b.box(VC.solid, liv[1], 0, 1.93, z0 + 0.03, TRAIN_W - 0.5, 0.06, 0.02);
+      b.add(G.plane, fSign, 0, 3.0, z0 + 0.03, 1.5, 0.28, 1);
     };
+    const cableExtra = (b, c) => K.cableDress(b, { zf: c.z0, f: 1, L: c.bl, W: TRAIN_W, R: TRAIN_H, solid: true, front: c.front, riders: 0.6 });   // the cable car on the train's body (sf_kit.js)
     const trainStyle = {
       body: '#f0e6cc', bodyMetal: false, roof: '#c8ccd4', under: '#1e2026', stripe: '#f0e6cc', stripe2: null, doors: true, door: '#3a3a40',
-      window: '#ffe8c0', windowK: 1.1, frame: '#14171d', light: '#fff4dc', sign: '#1a1a1a', roofUnit: '#8a909a', extra: pcc,
+      window: '#ffe8c0', windowK: 1.1, frame: '#14171d', light: '#fff4dc', sign: '#1a1a1a', roofUnit: '#e8e2d0', extra: pcc,
       rampMat: std({ map: stripeTex('#1e2026', '#ffcf8a', 6), roughness: 0.6 }), rampGlow: '#ffcf8a',
       movingStyle: { body: '#7a1a24', roof: '#e8dcc0', stripe: '#7a1a24', stripe2: null, windows: false, doors: false, strobe: false, roofUnits: false, light: '#fff0c8', sign: '#efe4c8', window: '#ffe0a8', windowK: 1.0, extra: cableExtra },
     };

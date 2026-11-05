@@ -1,8 +1,8 @@
 // The Qianjiang light show (钱江新城灯光秀): the towers along both banks of the Qiantang become one screen and play the
 // same picture together, a program at a time: 最忆是杭州 in gold on red, the tide rolling from tower to tower, lotus,
 // West Lake in blue ink (Leifeng Pagoda, the Broken Bridge, the Three Pools, the moon), koi, fireworks, each wiped into
-// the next by a sweep of white light. The pictures are painted once into an atlas; every facade, the skyline's towers
-// and the reflections streaking across the river read the same clock, so the whole city changes at once.
+// the next by a sweep of white light. The pictures are painted once into an atlas; every facade and the reflections
+// streaking across the river read the same clock, so the whole city changes at once.
 //
 // A show surface carries its tower in the vertex colour (the Batcher bakes it): r = where the face starts along the
 // picture (one picture spans a chunk, 80 m wide and 40 m high, so neighbouring chunks join up; it repeats up a tall
@@ -104,14 +104,14 @@ function paintPrograms() {
 }
 
 const PROG = `
-  uniform sampler2D map; uniform float time, cellK;
+  uniform sampler2D map; uniform float time;
   const float N = ${N}.0, DUR = 9.0, PICH = ${(PIC_W / 2).toFixed(1)};
   float showHash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
   vec3 tap(float i, float u, float v) { return texture2D(map, vec2(fract(u), 1.0 - (i + 1.0 - clamp(v, 0.01, 0.99)) / N)).rgb; }
   // program i at U along the picture, height y (m), on a face wM metres wide, ux across it
   vec3 prog(float i, float U, float y, float wM, float ux) {
-    float V = fract(y / (PICH * cellK));
-    if (i < 0.5) { float cell = max(wM, 8.0) * cellK, row = floor(y / cell); return tap(0.0, (mod(-row, 5.0) + ux) / 5.0, 0.3 + 0.4 * fract(y / cell)); }
+    float V = fract(y / PICH);
+    if (i < 0.5) { float cell = max(wM, 8.0), row = floor(y / cell); return tap(0.0, (mod(-row, 5.0) + ux) / 5.0, 0.3 + 0.4 * fract(y / cell)); }
     if (i < 1.5) return tap(1.0, U - time * 0.05, V);                                     // the tide rolls along the bank
     if (i < 3.5) return tap(i, U, V);
     if (i < 4.5) return tap(4.0, U + time * 0.03, V + 0.03 * sin(time * 1.3 + U * 9.0));   // the koi swim
@@ -123,7 +123,7 @@ const PROG = `
     vec3 col = prog(cur, U, y, wM, ux);
     float w = clamp((f - 0.88) / 0.12, 0.0, 1.0);
     if (w > 0.0) {
-      float s = fract(U) * 0.75 + fract(y / (PICH * cellK)) * 0.25, e = w * 1.3 - 0.15;
+      float s = fract(U) * 0.75 + fract(y / PICH) * 0.25, e = w * 1.3 - 0.15;
       if (s < e) col = prog(nxt, U, y, wM, ux);
       col += vec3(1.0, 0.96, 0.9) * (1.0 - smoothstep(0.0, 0.06, abs(s - e))) * 1.6;
     }
@@ -141,27 +141,26 @@ export function makeShow() {
   tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter;
   const time = { value: 0 };
   // a facade screen in the street: curved with the world, thinned fog so the far bank still shines, an LED grain of
-  // dark floor lines every 3.6 m (sky: every 9 units) and window mullions. The skyline's units are bigger: cellK scales
-  // the picture's height and the slogan's characters to them.
-  const facade = ({ curved = true, fogK = 0.5, k = 1.0, floorH = 3.6, sky = false } = {}) => {
-    const u = uniforms({ time: { value: 0 }, k: { value: k }, fade: { value: 1 }, cellK: { value: sky ? 3.3 : 1 } });
+  // dark floor lines every 3.6 m and window mullions
+  const facade = ({ fogK = 0.5, k = 1.0, floorH = 3.6 } = {}) => {
+    const u = uniforms({ time: { value: 0 }, k: { value: k } });
     u.time = time; u.map = { value: tex };
     return new THREE.ShaderMaterial({
-      uniforms: u, vertexColors: true, fog: !sky, transparent: sky, depthWrite: !sky,
+      uniforms: u, vertexColors: true, fog: true,
       vertexShader: `uniform float uCurveY, uCurveX; varying vec2 vUv; varying vec3 vC; varying float vY;
         #include <fog_pars_vertex>
-        void main(){ vUv = uv; vC = color; vY = position.y; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); ${curved ? CURVE_GLSL : ''}
+        void main(){ vUv = uv; vC = color; vY = position.y; vec4 mvPosition = modelViewMatrix * vec4(position, 1.0); ${CURVE_GLSL}
           gl_Position = projectionMatrix * mvPosition;
           #include <fog_vertex>
         }`,
       fragmentShader: `${PROG}
-        uniform float k, fade; varying vec2 vUv; varying vec3 vC; varying float vY;
+        uniform float k; varying vec2 vUv; varying vec3 vC; varying float vY;
         #include <fog_pars_fragment>
         void main(){
           float wM = vC.b * ${PIC_W.toFixed(1)}, U = vC.r + vUv.x * vC.b;
           vec3 col = showAt(U, vY, wM, vUv.x);
           float led = (0.7 + 0.3 * step(0.16, fract(vY / ${floorH.toFixed(1)}))) * (0.86 + 0.14 * step(0.1, fract(vUv.x * wM / 1.6)));
-          gl_FragColor = vec4((col * 0.92 + 0.035) * led * k * vC.g, ${sky ? 'fade' : '1.0'});
+          gl_FragColor = vec4((col * 0.92 + 0.035) * led * k * vC.g, 1.0);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
           #ifdef USE_FOG
@@ -173,7 +172,7 @@ export function makeShow() {
   // the show's light on the water: an additive streak lying from a tower's foot toward the runner, its colour the
   // middle of that tower's slice of the picture, broken by ripples
   const refl = (() => {
-    const u = uniforms({ time: { value: 0 }, k: { value: 1.8 }, cellK: { value: 1 } });
+    const u = uniforms({ time: { value: 0 }, k: { value: 1.8 } });
     u.time = time; u.map = { value: tex };
     return new THREE.ShaderMaterial({
       uniforms: u, vertexColors: true, fog: false, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -198,7 +197,6 @@ export function makeShow() {
     street: facade({ fogK: 0.55 }),           // towers along the near bank and in the scenes
     far: facade({ fogK: 0.3, k: 1.05 }),      // the far bank across the river
     hero: facade({ fogK: 0.35, k: 1.15 }),    // the light-show scene, at full brightness
-    sky: facade({ curved: false, sky: true, floorH: 9, k: 0.95 }),   // the skyline's towers (fogless, faded in and out)
     refl,
     // a tower face's baked data: where it starts along the picture (m), its brightness, its width (m)
     tint: (startM, bright, widthM) => new THREE.Color(((startM / PIC_W) % 1 + 1) % 1, bright, widthM / PIC_W),

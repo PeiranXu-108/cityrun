@@ -8,7 +8,7 @@
 import { THREE, Batcher, VC, G, std, basic, hdr, canvasTex, CHUNK_LEN, rand, randi, pick, chance } from '../core.js';
 import { EDGE } from './common.js';
 import { beam } from './tokyo_kit.js';
-import { frame, thinFog } from './ny_icons.js';
+import { frame, thinFog, figure } from './ny_icons.js';
 import { GG, ggTower, cable } from './sf_icons.js';
 
 export const STRETCH = { first: 19, len: 7 };   // its first chunk on the 48-chunk loop, and how many chunks it takes
@@ -73,20 +73,29 @@ export function makeBridge(K) {
     for (const s of [-1, 1]) {
       const pts = [];
       for (let Sv = S0 - 1; Sv <= S0 + CHUNK_LEN + 1; Sv += 3) { const y = cableY(Sv); if (y !== null) pts.push([s * X, y, z(Sv)]); else if (pts.length) break; }
-      if (pts.length > 1) cable(W, paint, S.cOrange, pts, 0.48);
+      if (pts.length > 1) {
+        cable(W, paint, S.cOrange, pts, 0.48);
+        for (const e of [-1, 1]) cable(W, paint, S.cOrange2, pts.map(([x, y, zz]) => [x + e * 0.5, y + 1.0, zz]), 0.03);   // the handropes along its top
+      }
       for (let Sv = Math.ceil(S0 / 7.5) * 7.5; Sv < S0 + CHUNK_LEN; Sv += 7.5) {
         const y = cableY(Sv);
         if (y === null || y < 1.8 || Math.abs(Sv - ST) < 4 || Math.abs(Sv - SN) < 4 || Sv < DECK[0] || Sv > DECK[1]) continue;
         for (const dz of [-0.14, 0.14]) b.box(paint, S.cOrange2, s * X, (y + 0.3) / 2, z(Sv) + dz, 0.08, y - 0.3, 0.08);
         b.box(paint, S.cOrange2, s * X, 0.2, z(Sv), 0.5, 0.4, 0.6);
+        const ya = cableY(Sv - 0.3), yb = cableY(Sv + 0.3);   // the cable band they hang from, its handrope post
+        if (ya !== null && yb !== null) W.span(G.cyl8, paint, S.cOrange2, [s * X, ya, z(Sv - 0.3)], [s * X, yb, z(Sv + 0.3)], 1.25);
+        if (Math.round(Sv / 7.5) % 2 === 0) for (const e of [-1, 1]) b.box(paint, S.cOrange2, s * X + e * 0.5, y + 0.55, z(Sv), 0.05, 0.9, 0.05);
       }
     }
     // the roadway lights on the railing; the traffic, slow in the fog, headlamps toward you, tail lamps away
     for (let Sv = Math.ceil(S0 / 25) * 25 + 6; Sv < S0 + CHUNK_LEN; Sv += 25) for (const s of [-1, 1]) {
       if (Sv < DECK[0] - 10 || Sv > DECK[1] + 10) continue;
-      b.cyl(paint, S.cOrange, s * 10.7, 3.6, z(Sv), 0.11, 7.2, 'cyl8');
+      b.cyl(paint, S.cOrange, s * 10.7, 3.6, z(Sv), 0.11, 7.2, 'cyl8'); b.cyl(paint, S.cOrange2, s * 10.7, 0.5, z(Sv), 0.2, 1.0, 'cyl8');
+      for (let k = 0; k < 4; k++) { const a = (k / 4) * Math.PI * 2; b.box(paint, S.cOrange2, s * 10.7 + Math.cos(a) * 0.11, 3.8, z(Sv) + Math.sin(a) * 0.11, 0.05, 5.6, 0.05); }   // its flutes
       beam(b, paint, s * 10.7, 6.9, z(Sv), s * 8.3, 7.4, z(Sv), 0.09, S.cOrange);
-      b.box(VC.glow, hdr('#ffc070', 2.4), s * 8.1, 7.25, z(Sv), 0.7, 0.16, 0.36);
+      beam(b, paint, s * 10.7, 6.2, z(Sv), s * 9.4, 7.2, z(Sv), 0.05, S.cOrange);
+      b.box(paint, S.cOrange2, s * 8.1, 7.38, z(Sv), 0.84, 0.16, 0.46);
+      b.box(VC.glow, hdr('#ffc070', 2.4), s * 8.1, 7.25, z(Sv), 0.7, 0.12, 0.36);
       K.pool(b, s * 8.0, z(Sv), 6, 6, hdr('#ffb060', 0.12));
     }
     for (const s of [-1, 1]) for (let zz = rand(2, 8); zz < CHUNK_LEN - 3; zz += rand(8, 14)) if (chance(0.7)) K.car(b, s * 5.5, -zz, s, { lit: true });
@@ -108,8 +117,12 @@ export function makeBridge(K) {
       b.block(VC.solid, '#c8c0b0', s * (X + 3.1), -12, za + dir * 4, 8.4, 20, 18);
       b.box(VC.solid, '#b8b0a0', s * (X + 3.1), 8.4, za + dir * 4, 9.0, 0.8, 18.6);
       const px = s * 17.5, pz = za + dir * 10;
-      for (const [y0, y1, w, d] of [[0, 9, 6, 8], [9, 17, 5, 7], [17, 23, 4, 6], [23, 27, 3, 5]]) b.block(VC.solid, '#d8d0c0', px, y0, pz, w, y1 - y0, d);
-      for (const e of [-1, 1]) b.box(VC.solid, '#c0b8a8', px - s * 3.05, 11, pz + e * 1.6, 0.14, 22, 0.5);   // its flutes
+      for (const [y0, y1, w, d] of [[0, 9, 6, 8], [9, 17, 5, 7], [17, 23, 4, 6], [23, 27, 3, 5]]) {
+        b.block(VC.solid, '#d8d0c0', px, y0, pz, w, y1 - y0, d);
+        for (const e of [-1, 1]) for (const o of [-0.25, 0.25]) { b.box(VC.solid, '#bcb4a4', px + e * (w / 2 + 0.04), (y0 + y1) / 2, pz + o * d, 0.1, y1 - y0 - 0.6, 0.36); b.box(VC.solid, '#bcb4a4', px + o * w, (y0 + y1) / 2, pz + e * (d / 2 + 0.04), 0.36, y1 - y0 - 0.6, 0.1); }   // its grooves
+        b.box(VC.solid, '#e4dccc', px, y1 - 0.2, pz, w + 0.3, 0.4, d + 0.3);   // the ledge at the setback
+      }
+      b.block(VC.solid, '#c8c0b0', px, 27, pz, 2.2, 1.2, 4); b.box(VC.glow, hdr('#ffd9a0', 1.4), px, 28.35, pz, 1.4, 0.3, 2.6);   // the cap, its lamp
     }
   };
   // the ground of a land end: z from zA to zB (chunk-local), a cliff face at zA dropping into the fog
@@ -127,11 +140,14 @@ export function makeBridge(K) {
     piece(b, 0);
     land(b, -DECK[0], 0);
     K.pave(b, -26, -30, 30, 40);
-    b.cyl(VC.solid, '#e8e2d6', -30, 2.4, -24, 8.5, 4.8, 'cyl');   // the Round House: its band of windows, its flat roof
+    b.cyl(VC.solid, '#e8e2d6', -30, 2.4, -24, 8.5, 4.8, 'cyl');   // the Round House: its band of windows and their mullions, the roof's deep overhang, the canopy over its door
     b.cyl(VC.glow, hdr('#ffe0b0', 1.0), -30, 2.6, -24, 8.55, 1.8, 'cyl');
-    b.cyl(VC.solid, '#d8d0c4', -30, 5.0, -24, 9.2, 0.4, 'cyl');
-    b.block(VC.solid, '#7a7468', 13.6, 0, -34, 2.4, 2.6, 2.4);   // Joseph Strauss on his plinth
-    K.person(b, 13.6, -34, { y: 2.6, s: 1.6, top: '#3a3024', legs: '#3a3024', hat: 'none', bag: false, phone: false, ry: -Math.PI / 2 });
+    for (let k = 0; k < 14; k++) { const a = (k / 14) * Math.PI * 2; b.box(VC.solid, '#e8e2d6', -30 + Math.sin(a) * 8.56, 2.6, -24 + Math.cos(a) * 8.56, 0.16, 1.82, 0.16, a); }   // (at the band's corners)
+    b.cyl(VC.solid, '#d8d0c4', -30, 5.0, -24, 9.4, 0.5, 'cyl'); b.cyl(VC.solid, '#c8c0b2', -30, 4.7, -24, 9.0, 0.2, 'cyl');
+    b.box(VC.solid, '#d8d0c4', -21.2, 3.1, -24, 1.6, 0.2, 3.4);
+    b.block(VC.solid, '#6a645a', 13.6, 0, -34, 2.6, 0.5, 2.6); b.block(VC.solid, '#7a7468', 13.6, 0.5, -34, 2.2, 2.1, 2.2);   // Joseph Strauss in bronze on his plinth, the plaque on it
+    b.box(VC.solid, '#a88a4a', 13.6 - 1.11, 1.5, -34, 0.02, 0.6, 1.0);
+    figure(frame(b, 13.6, 2.6, -34, 1.6, Math.PI), VC.metal, '#5a4a34', { arms: 'out' });
     b.cyl(VC.metal, '#8a8e94', -14.5, 1.0, -44, 1.0, 0.7, 'cyl', Math.PI / 2);   // a slice of the main cable, its wires showing
     b.add(G.plane, K.label('GOLDEN GATE BRIDGE', { w: 1024, h: 160, color: '#f4ecd8', bg: '#5a3a24', font: '"Playfair Display", Georgia, serif', weight: 700, size: 0.5, k: 0.95 }), -13.2, 2.4, -12, 5.4, 0.85, 1, 0, Math.PI / 2, 0);
     b.box(VC.solid, '#5a3a24', -13.3, 1.0, -12, 0.2, 2.0, 0.3);

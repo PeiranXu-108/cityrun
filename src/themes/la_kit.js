@@ -406,10 +406,16 @@ export function makeKit() {
     g.fillText(text, w / 2, h / 2 + h * 0.04);
     if (glow) { g.shadowBlur = Math.min(w, h) * 0.03; g.fillText(text, w / 2, h / 2 + h * 0.04); }
   };
-  K.sign = (t, text, o = {}, x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0) => {
+  K.labelRect = (text, o = {}) => {   // a label's cell in the atlas (for a surface of one's own: K.sign puts it on a plane)
     const w = Math.round((o.w || 512) / 2), h = Math.round((o.h || 128) / 2);
-    const r = slot(['h', text, w, h, o.color, o.font, o.weight, o.size, o.bg, o.border, o.glow].join('|'), w, h, (g) => drawLabel(g, w, h, text, o));
-    return t.add(planeUV(r), K.labelMat, x, y, z, sx, sy, sz, rx, ry, rz, hdr('#ffffff', o.k ?? 1.1));
+    return slot(['h', text, w, h, o.color, o.font, o.weight, o.size, o.bg, o.border, o.glow].join('|'), w, h, (g) => drawLabel(g, w, h, text, o));
+  };
+  K.sign = (t, text, o = {}, x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0) => t.add(planeUV(K.labelRect(text, o)), K.labelMat, x, y, z, sx, sy, sz, rx, ry, rz, hdr('#ffffff', o.k ?? 1.1));
+  // a label round a cylinder of radius r (a water tank's side), arc radians of it centred on the bearing a (0: toward +z)
+  K.curvedSign = (t, text, o, x, y, z, r, h, arc, a) => {
+    const g = new THREE.CylinderGeometry(r, r, h, 16, 1, true, a - arc / 2, arc), uv = g.attributes.uv, R = K.labelRect(text, o);
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, R.u0 + (R.u1 - R.u0) * uv.getX(i), R.v0 + (R.v1 - R.v0) * uv.getY(i));
+    t.addM(g, K.labelMat, new THREE.Matrix4().makeTranslation(x, y, z), hdr('#ffffff', o.k ?? 1.1));
   };
   K.vsign = (t, text, { color = '#ffffff', font = BLADE, bg = null, glow = null, k = 1.4 } = {}, x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0) => {   // its letters stacked one under another
     // painted lying on its side, first letter on the right, so it packs on a low shelf; the plane turned a quarter in its own
@@ -428,7 +434,7 @@ export function makeKit() {
 
   // ---------- trees and plants ----------
   const SY = sydneyTreeKit(), LJ = lijiangTreeKit(), LT = laTreeKit();
-  K.fanPalm = LT.fanPalm; K.strelitzia = LT.strelitzia; K.palm = SY.palm; K.jacaranda = SY.jacaranda; K.fig = SY.fig; K.bougain = LJ.bougain;
+  K.fanPalm = LT.fanPalm; K.strelitzia = LT.strelitzia; K.palm = SY.palm; K.jacaranda = SY.jacaranda; K.fig = SY.fig; K.gum = SY.gum; K.pine = SY.norfolk; K.bougain = LJ.bougain;
   // a row of fan palms down the street at x, their crowns all of a height or near it
   K.palmRow = (b, x, z0, z1, { step = [12, 16], gaps = [], s = [0.95, 1.15] } = {}) => {
     for (let z = z0 + rand(1, step[0] * 0.6); z < z1 - 1; z += rand(...step)) if (!gaps.some(([a, c]) => z > a - 1.2 && z < c + 1.2)) K.fanPalm(b, x, -z, rand(...s));
@@ -441,62 +447,103 @@ export function makeKit() {
 
   // ---------- people and animals ----------
   // costume: 'cowboy', 'pirate', 'robot' or 'showgirl' (Hollywood Boulevard's characters); beach: dressed for the sand;
-  // surf: a board under the arm; skate: riding a skateboard; skates: on roller skates; buff: Muscle Beach
-  K.person = (b, x, z, { s = rand(0.92, 1.06), y = 0, top = null, legs = null, hat = null, ry = null, seated = false, bag = chance(0.16), phone = chance(0.14), kid = false, camera = false,
+  // surf: a board under the arm; skate: riding a skateboard; skates: on roller skates; buff: Muscle Beach. Poses: standing
+  // (the arms swinging, or a phone, a camera, a bag in hand), seated, lying (on the back, or on the front paddling a
+  // board), reach (the arms up: a spike, a trick, balance), crouch (riding a wave). Limbs are boxes between the joints.
+  K.person = (b, x, z, { s = rand(0.92, 1.06), y = 0, top = null, legs = null, hat = null, ry = null, seated = false, lying = false, paddle = false, reach = false, crouch = false, bag = chance(0.16), phone = chance(0.14), kid = false, camera = false,
     shorts = chance(0.45), beach = false, surf = false, skate = false, skates = false, buff = false, shades = chance(0.45), costume = null } = {}) => {
     const a = ry ?? rand(-0.5, 0.5) + (chance(0.5) ? Math.PI : 0), ca = Math.cos(a), sa = Math.sin(a), skin = pick(SKIN);
-    const P = (fx, fy, fz) => [x + fx * ca + fz * sa, y + fy, z - fx * sa + fz * ca];
     if (kid) s *= 0.62;
-    if (skate || skates) { y += skate ? 0.13 : 0.09; if (skate) { b.add(G.box, VC.solid, x, y - 0.06, z, 0.24, 0.03, 0.82, 0, a + Math.PI / 2, 0, pick(['#c8302a', '#141414', '#ffd23d', '#39c8e8'])); for (const e of [-0.28, 0.28]) b.add(G.box, VC.solid, ...P(e, -0.1, 0), 0.24, 0.06, 0.06, 0, a, 0, '#f4f0e8'); } }
+    const W3 = (fx, fy, fz) => [x + (fx * ca + fz * sa) * s, y + fy * s, z + (-fx * sa + fz * ca) * s];   // a point of the body in the chunk
+    const bone = (p, q, t, col, mat = VC.solid) => beam(b, mat, ...W3(...p), ...W3(...q), t * s, col);
+    const part = (geo, mat, fx, fy, fz, sx, sy, sz, col, rx = 0, rz = 0) => b.add(geo, mat, ...W3(fx, fy, fz), sx * s, sy * s, sz * s, rx, a, rz, col);
+    if (skate || skates) {
+      y += skate ? 0.13 : 0.09;
+      if (skate) { part(G.box, VC.solid, 0, -0.06 / s, 0, 0.82, 0.03, 0.24, pick(['#c8302a', '#141414', '#ffd23d', '#39c8e8']), 0, 0); for (const e of [-0.28, 0.28]) part(G.box, VC.solid, e, -0.1 / s, 0, 0.06, 0.06, 0.24, '#f4f0e8'); }
+    }
     const robot = costume === 'robot', c = top || (robot ? '#b8bcc4' : beach ? (chance(0.4) ? skin : pick(SWIM)) : costume === 'pirate' ? '#f4f0e8' : costume === 'showgirl' ? '#ff4a9a' : pick(TOPS));
     const bare = beach || shorts || costume === 'showgirl', lg = legs || (beach ? pick(SWIM) : costume === 'cowboy' ? '#3a4a6a' : costume === 'pirate' ? '#1a1a1e' : pick(LEGS));
-    const W = buff ? 0.62 : 0.46, bodyMat = robot ? VC.metal : VC.solid;
-    if (seated) {
-      for (const e of [-1, 1]) { b.add(G.box, VC.solid, ...P(e * 0.09 * s, 0.5 * s, -0.18 * s), 0.15 * s, 0.14 * s, 0.42 * s, 0, a, 0, lg); b.add(G.box, VC.solid, ...P(e * 0.09 * s, 0.24 * s, -0.36 * s), 0.13 * s, 0.48 * s, 0.14 * s, 0, a, 0, bare ? skin : lg); }
-      b.add(G.box, VC.solid, ...P(0, 0.9 * s, 0.02), 0.46 * s, 0.62 * s, 0.28 * s, 0, a, 0, c);
-    } else {
+    const W = buff ? 0.58 : 0.42, D = buff ? 0.3 : 0.24, bodyMat = robot ? VC.metal : VC.solid, shin = robot ? c : bare ? skin : lg, thigh = robot ? c : lg;
+    const sleeve = robot ? c : beach || costume === 'showgirl' ? skin : c, arm = robot ? c : skin;
+    const shoe = skates ? '#f4f0e8' : costume === 'cowboy' ? '#5a3a1a' : beach ? skin : pick(['#1a1a1a', '#e8e8e8', '#5a3a2a', '#f4f0e8', '#c8302a']);
+    let hy;
+    if (lying) {   // flat on the towel (or a board), along its length, the head toward local -z
+      hy = 0.12;
+      part(G.box, bodyMat, 0, 0.13, -0.3, W * 0.95, 0.22, 0.52, c);
+      part(G.box, VC.solid, 0, 0.12, 0.02, 0.34, 0.2, 0.16, lg);
+      for (const e of [-1, 1]) { bone([e * 0.09, 0.11, 0.08], [e * 0.1, 0.1, 0.48], 0.15, thigh); bone([e * 0.1, 0.1, 0.48], [e * 0.1, 0.09, 0.86], 0.12, shin); part(G.box, VC.solid, e * 0.1, 0.13, 0.91, 0.1, 0.16, 0.08, shoe); }
       for (const e of [-1, 1]) {
-        b.add(G.box, bodyMat, ...P(e * 0.085 * s, 0.6 * s, 0), 0.15 * s, 0.42 * s, 0.18 * s, 0, a, 0, robot ? c : lg);
-        b.add(G.box, bodyMat, ...P(e * 0.085 * s, 0.2 * s, 0), 0.14 * s, 0.4 * s, 0.17 * s, 0, a, 0, robot ? c : bare ? skin : lg);
+        if (paddle) { bone([e * 0.26, 0.15, -0.5], [e * 0.36, 0.0, -0.78], 0.1, sleeve); bone([e * 0.36, 0.0, -0.78], [e * 0.4, -0.18, -1.08], 0.09, arm); }
+        else { bone([e * 0.26, 0.13, -0.5], [e * 0.29, 0.1, -0.22], 0.1, sleeve); bone([e * 0.29, 0.1, -0.22], [e * 0.3, 0.08, 0.08], 0.09, arm); }
       }
-      b.add(G.box, VC.solid, ...P(0, 0.04 * s, -0.04), 0.38 * s, 0.08 * s, 0.3 * s, 0, a, 0, skates ? '#f4f0e8' : costume === 'cowboy' ? '#5a3a1a' : beach ? skin : pick(['#1a1a1a', '#e8e8e8', '#5a3a2a', '#f4f0e8']));
-      if (skates) for (const e of [-1, 1]) for (const f of [-0.1, 0.1]) b.add(G.box, VC.solid, ...P(e * 0.085 * s, -0.04, f), 0.08, 0.08, 0.08, 0, a, 0, pick(['#ff5aa0', '#39e8ff', '#ffd23d']));
-      b.add(G.box, bodyMat, ...P(0, 1.1 * s, 0), W * s, (buff ? 0.66 : 0.62) * s, (buff ? 0.34 : 0.28) * s, 0, a, 0, c);
-      if (buff) for (const e of [-1, 1]) {   // a bodybuilder's double biceps: the upper arms out level, the forearms up
-        b.add(G.box, VC.solid, ...P(e * 0.46 * s, 1.32 * s, 0), 0.34 * s, 0.17 * s, 0.17 * s, 0, a, 0, skin);
-        b.add(G.box, VC.solid, ...P(e * 0.6 * s, 1.55 * s, 0), 0.14 * s, 0.34 * s, 0.14 * s, 0, a, 0, skin);
-      }
-      if (costume === 'cowboy') b.add(G.box, VC.solid, ...P(0, 1.12 * s, 0.01), 0.48 * s, 0.5 * s, 0.3 * s, 0, a, 0, '#7a4a2a');   // his leather vest
-      else if (costume === 'pirate') b.add(G.box, VC.solid, ...P(0, 0.86 * s, 0), 0.48 * s, 0.1 * s, 0.3 * s, 0, a, 0, '#c8202a');   // the red sash
-      else if (!beach && chance(0.25)) b.add(G.box, VC.solid, ...P(0, 1.1 * s, 0), (W + 0.01) * s, 0.2 * s, 0.29 * s, 0, a, 0, shade(c, 0.7));
+      part(G.sphLow, VC.solid, 0, paddle ? 0.3 : 0.15, -0.72, 0.24, 0.26, 0.28, skin);
+      const hc = pick(HAIR);
+      part(G.sphLow, VC.solid, 0, paddle ? 0.36 : 0.14, -0.8, 0.26, 0.2, 0.2, hc);
+      if (shades && !paddle) part(G.box, VC.solid, 0, 0.29, -0.72, 0.22, 0.03, 0.06, '#101014');
+      return;
     }
-    const hy = seated ? 1.36 : 1.62;
-    if (robot) { b.add(G.box, VC.metal, ...P(0, (hy + 0.02) * s, 0), 0.3 * s, 0.32 * s, 0.3 * s, 0, a, 0, '#c8ccd4'); for (const e of [-1, 1]) b.box(VC.glow, hdr('#39e8ff', 2.4), ...P(e * 0.07 * s, (hy + 0.04) * s, -0.16 * s), 0.06 * s, 0.05 * s, 0.02); b.add(G.cyl6, VC.metal, ...P(0, (hy + 0.3) * s, 0), 0.03, 0.24 * s, 0.03, 0, 0, 0, '#c8ccd4'); return; }
-    b.add(G.sphLow, VC.solid, ...P(0, hy * s, 0), 0.28 * s, 0.32 * s, 0.28 * s, 0, a, 0, skin);
+    if (seated) {   // on a bench, a seat, the sand: the thighs forward, the shins down
+      hy = 1.2;
+      part(G.box, VC.solid, 0, 0.5, 0.02, 0.36, 0.14, 0.22, lg);
+      for (const e of [-1, 1]) { bone([e * 0.09, 0.5, 0], [e * 0.1, 0.5, -0.42], 0.15, thigh); bone([e * 0.1, 0.5, -0.42], [e * 0.1, 0.06, -0.46], 0.12, shin); part(G.box, VC.solid, e * 0.1, 0.04, -0.52, 0.12, 0.08, 0.24, shoe); }
+      part(G.box, bodyMat, 0, 0.81, 0.03, W, 0.52, D, c);
+      for (const e of [-1, 1]) { const sx = e * (W / 2 + 0.05); bone([sx, 1.0, 0.03], [sx + e * 0.02, 0.76, -0.06], 0.1, sleeve, bodyMat); bone([sx + e * 0.02, 0.76, -0.06], [e * 0.16, 0.6, -0.3], 0.09, arm, bodyMat); }
+    } else {
+      const k = crouch ? 0.82 : 1, hip = 0.9 * k;
+      hy = crouch ? 1.4 : 1.64;
+      for (const e of [-1, 1]) {
+        const knee = crouch ? [e * 0.14, 0.45, -0.16] : [e * 0.09, 0.48, 0], foot = crouch ? [e * 0.13, 0.08, e * 0.26] : [e * 0.09, 0.08, 0];
+        bone(foot, knee, 0.12, shin, bodyMat); bone(knee, [e * 0.095, hip, 0], 0.15, thigh, bodyMat);
+        part(G.box, VC.solid, foot[0], 0.04, foot[2] - 0.05, 0.12, 0.08, 0.26, shoe);
+      }
+      if (skates) for (const e of [-1, 1]) for (const f of [-0.1, 0.1]) part(G.box, VC.solid, e * 0.09, -0.04 / s, f, 0.07, 0.07, 0.07, pick(['#ff5aa0', '#39e8ff', '#ffd23d']));
+      part(G.box, VC.solid, 0, hip + 0.02, 0, 0.36, 0.14, 0.22, lg);
+      part(G.box, bodyMat, 0, hip + 0.33, crouch ? -0.08 : 0, W, 0.5, D, c, crouch ? -0.3 : 0);
+      if (costume === 'cowboy') part(G.box, VC.solid, 0, hip + 0.34, 0.005, W + 0.02, 0.44, D + 0.02, '#7a4a2a');   // his leather vest
+      else if (costume === 'pirate') part(G.box, VC.solid, 0, hip + 0.1, 0, W + 0.02, 0.08, D + 0.02, '#c8202a');   // the red sash
+      else if (!beach && !robot && chance(0.25)) part(G.box, VC.solid, 0, hip + 0.47, 0, W + 0.01, 0.08, D + 0.01, shade(c, 0.7));   // a collar, a yoke
+      const sh = hip + 0.55, swing = rand(-1, 1);
+      for (const e of [-1, 1]) {
+        const sx = e * (W / 2 + 0.05);
+        let el, hd;
+        if (buff) { el = [e * (W / 2 + 0.32), sh, 0]; hd = [e * (W / 2 + 0.36), sh + 0.32, -0.04]; }   // a bodybuilder's double biceps
+        else if (reach || crouch) { el = [e * (W / 2 + 0.26), sh + (crouch ? -0.04 : 0.18), -0.04]; hd = [e * (W / 2 + 0.5), sh + (crouch ? -0.1 : 0.46), -0.08]; }
+        else if (camera) { el = [e * 0.24, sh - 0.2, -0.16]; hd = [e * 0.07, sh + 0.1, -0.26]; }
+        else if (phone && e > 0 && !beach) { el = [sx + 0.02, sh - 0.27, -0.04]; hd = [0.1, sh - 0.12, -0.27]; }
+        else { el = [sx + e * 0.02, sh - 0.28, swing * e * 0.07]; hd = [sx + e * 0.01, sh - 0.56, swing * e * 0.16]; }
+        bone([sx, sh, 0], el, buff ? 0.15 : 0.105, sleeve, bodyMat); bone(el, hd, buff ? 0.13 : 0.095, arm, bodyMat);
+      }
+    }
+    const H = hy;   // the head and what is on it
+    if (robot) { part(G.box, VC.metal, 0, H + 0.02, 0, 0.3, 0.32, 0.3, '#c8ccd4'); for (const e of [-1, 1]) b.box(VC.glow, hdr('#39e8ff', 2.4), ...W3(e * 0.07, H + 0.04, -0.16), 0.06 * s, 0.05 * s, 0.02); part(G.cyl6, VC.metal, 0, H + 0.3, 0, 0.03, 0.24, 0.03, '#c8ccd4'); return; }
+    part(G.sphLow, VC.solid, 0, H, 0, 0.24, 0.29, 0.25, skin);
     const hc = pick(HAIR), hk = hat || (costume === 'cowboy' ? 'cowboy' : costume === 'pirate' ? 'pirate' : costume === 'showgirl' ? 'plumes' : kid ? pick(['none', 'cap']) : pick(['none', 'none', 'none', 'cap', 'long', 'long', 'sunhat', 'bucket']));
-    if (hk === 'cap') { b.add(G.box, VC.solid, ...P(0, (hy + 0.13) * s, 0), 0.3 * s, 0.1 * s, 0.3 * s, 0, a, 0, pick(['#c8302a', '#1a1a1e', '#2a4a8a', '#f2c230', '#f4f0e8'])); b.add(G.box, VC.solid, ...P(0, (hy + 0.1) * s, -0.2 * s), 0.24 * s, 0.03 * s, 0.16 * s, 0, a, 0, '#1a1a1e'); }
-    else if (hk === 'sunhat' || hk === 'cowboy') { const col = hk === 'cowboy' ? '#7a4a24' : pick(['#e8d8a8', '#f4f0e0', '#d8c08a']); b.add(G.cyl8, VC.solid, ...P(0, (hy + 0.12) * s, 0), 0.62 * s, 0.03 * s, 0.62 * s, 0, 0, 0, col); b.add(G.cyl8, VC.solid, ...P(0, (hy + 0.2) * s, 0), 0.3 * s, 0.16 * s, 0.3 * s, 0, 0, 0, col); }
-    else if (hk === 'bucket') b.add(G.cyl8, VC.solid, ...P(0, (hy + 0.15) * s, 0), 0.38 * s, 0.14 * s, 0.38 * s, 0, 0, 0, pick(['#f4f0e8', '#3a5a8a', '#c8a070']));
-    else if (hk === 'pirate') { b.add(G.cone4, VC.solid, ...P(0, (hy + 0.2) * s, 0), 0.5 * s, 0.22 * s, 0.4 * s, 0, a, 0, '#141414'); b.add(G.box, VC.solid, ...P(0, (hy + 0.08) * s, 0), 0.3 * s, 0.06 * s, 0.3 * s, 0, a, 0, '#c8202a'); }
-    else if (hk === 'plumes') { for (let k = 0; k < 5; k++) { const t = (k - 2) * 0.35; b.add(G.sphLow, VC.solid, ...P(Math.sin(t) * 0.22 * s, (hy + 0.4 + Math.cos(t) * 0.12) * s, 0.02), 0.12 * s, 0.6 * s, 0.06 * s, 0, a, t, pick(['#ff5aa0', '#ffd8f0', '#ffd23d'])); } }
-    else if (hk === 'long') { b.add(G.box, VC.solid, ...P(0, (hy + 0.1) * s, 0.02), 0.31 * s, 0.14 * s, 0.31 * s, 0, a, 0, hc); b.add(G.box, VC.solid, ...P(0, (hy - 0.16) * s, 0.08 * s), 0.32 * s, 0.46 * s, 0.14 * s, 0, a, 0, hc); }
-    else b.add(G.box, VC.solid, ...P(0, (hy + 0.12) * s, 0.025), 0.29 * s, 0.12 * s, 0.29 * s, 0, a, 0, hc);
-    if (shades && !kid) b.add(G.box, VC.solid, ...P(0, (hy + 0.03) * s, -0.145 * s), 0.25 * s, 0.06 * s, 0.03 * s, 0, a, 0, '#101014');
-    if (surf && !seated) b.add(G.sphLow, VC.solid, ...P(0.3 * s, 1.05 * s, 0.05 * s), 0.08 * s, 2.1 * s, 0.52 * s, 0, a, 0.08, pick(BOARDS));   // the board under the arm, nose up
-    if (camera) b.add(G.box, VC.solid, ...P(0, (hy - 0.02) * s, -0.24 * s), 0.18 * s, 0.11 * s, 0.1 * s, 0, a, 0, '#141414');
-    else if (phone && !seated && !beach) b.box(VC.glow, hdr('#cfe6ff', 1.4), ...P(0.06, 1.2 * s, -0.2 * s), 0.07, 0.12, 0.02);
-    if (bag && !seated && !beach && !surf) b.add(G.box, VC.solid, ...P(0.28 * s, 0.88 * s, 0), 0.1, 0.32, 0.3, 0, a, 0, pick(['#141414', '#c8a070', '#8a2a1a', '#2a3a5a', '#f4f0e8']));
+    if (hk === 'cap') { part(G.box, VC.solid, 0, H + 0.11, 0, 0.27, 0.09, 0.27, pick(['#c8302a', '#1a1a1e', '#2a4a8a', '#f2c230', '#f4f0e8'])); part(G.box, VC.solid, 0, H + 0.08, -0.18, 0.22, 0.03, 0.15, '#1a1a1e'); }
+    else if (hk === 'sunhat' || hk === 'cowboy') { const cl = hk === 'cowboy' ? '#7a4a24' : pick(['#e8d8a8', '#f4f0e0', '#d8c08a']); part(G.cyl8, VC.solid, 0, H + 0.1, 0, 0.6, 0.03, 0.6, cl); part(G.cyl8, VC.solid, 0, H + 0.18, 0, 0.28, 0.15, 0.28, cl); }
+    else if (hk === 'bucket') part(G.cyl8, VC.solid, 0, H + 0.13, 0, 0.36, 0.13, 0.36, pick(['#f4f0e8', '#3a5a8a', '#c8a070']));
+    else if (hk === 'pirate') { part(G.cone4, VC.solid, 0, H + 0.18, 0, 0.5, 0.22, 0.4, '#141414'); part(G.box, VC.solid, 0, H + 0.07, 0, 0.28, 0.06, 0.28, '#c8202a'); }
+    else if (hk === 'plumes') { for (let k = 0; k < 5; k++) { const t = (k - 2) * 0.35; part(G.sphLow, VC.solid, Math.sin(t) * 0.22, H + 0.38 + Math.cos(t) * 0.12, 0.02, 0.12, 0.6, 0.06, pick(['#ff5aa0', '#ffd8f0', '#ffd23d']), 0, t); } }
+    else if (hk === 'long') { part(G.sphLow, VC.solid, 0, H + 0.06, 0.02, 0.27, 0.22, 0.28, hc); part(G.box, VC.solid, 0, H - 0.14, 0.09, 0.27, 0.36, 0.1, hc); }
+    else part(G.sphLow, VC.solid, 0, H + 0.07, 0.025, 0.26, 0.18, 0.27, hc);
+    if (shades && !kid) part(G.box, VC.solid, 0, H + 0.025, -0.12, 0.23, 0.05, 0.03, '#101014');
+    if (surf && !seated) part(G.sphLow, VC.solid, 0.34, 1.0, 0.05, 0.08, 2.1, 0.52, pick(BOARDS), 0, 0.08);   // the board under the arm, nose up
+    if (camera) part(G.box, VC.solid, 0, H - 0.02, -0.29, 0.17, 0.1, 0.09, '#141414');
+    else if (phone && !seated && !beach && !reach && !buff) b.box(VC.glow, hdr('#cfe6ff', 1.4), ...W3(0.1, 1.33, -0.3), 0.07 * s, 0.12 * s, 0.02);
+    if (bag && !seated && !beach && !surf) part(G.box, VC.solid, 0.29, 0.86, 0.02, 0.09, 0.3, 0.3, pick(['#141414', '#c8a070', '#8a2a1a', '#2a3a5a', '#f4f0e8']));
   };
   K.crowd = (b, x0, x1, z0, z1, n, opts = {}) => { for (let i = 0; i < n; i++) K.person(b, rand(Math.min(x0, x1), Math.max(x0, x1)), -rand(z0, z1), opts); };
   K.throng = (b, x0, x1, z0, z1, n, gaps = [], opts = {}) => {   // a crowd kept out of the given stretches
     for (let i = 0, t = 0; i < n && t < n * 4; t++) { const z = rand(z0, z1); if (gaps.some(([a, c]) => z > a && z < c)) continue; K.person(b, rand(Math.min(x0, x1), Math.max(x0, x1)), -z, opts); i++; }
   };
   K.tourist = (b, x, z, ry) => K.person(b, x, z, { camera: true, ry, shorts: chance(0.6), hat: pick(['cap', 'none', 'sunhat', 'bucket']) });
-  K.dog = (b, x, z, ry = rand(0, Math.PI * 2)) => {   // a dog out on its walk
-    const ca = Math.cos(ry), sa = Math.sin(ry), P = (fx, fy, fz) => [x + fx * ca + fz * sa, fy, z - fx * sa + fz * ca], c = pick(['#c8a070', '#3a2a1a', '#e8e0d0', '#6a5a4a', '#1a1a1a', '#d8b888']);
+  K.dog = (b, x, z, ry = rand(0, Math.PI * 2), { y = 0 } = {}) => {   // a dog out on its walk: body, head and muzzle, ears, legs, tail
+    const ca = Math.cos(ry), sa = Math.sin(ry), P = (fx, fy, fz) => [x + fx * ca + fz * sa, y + fy, z - fx * sa + fz * ca], c = pick(['#c8a070', '#3a2a1a', '#e8e0d0', '#6a5a4a', '#1a1a1a', '#d8b888']);
     b.add(G.sphLow, VC.solid, ...P(0, 0.42, 0), 0.32, 0.3, 0.7, 0, ry, 0, c);
     b.add(G.sphLow, VC.solid, ...P(0, 0.62, -0.38), 0.24, 0.24, 0.3, 0, ry, 0, c);
+    b.add(G.box, VC.solid, ...P(0, 0.58, -0.56), 0.12, 0.1, 0.16, 0, ry, 0, shade(c, 0.8));
+    for (const e of [-0.08, 0.08]) b.add(G.box, VC.solid, ...P(e, 0.74, -0.34), 0.05, 0.12, 0.08, 0, ry, e * 2, shade(c, 0.85));
     for (const [fx, fz] of [[-0.1, -0.22], [0.1, -0.22], [-0.1, 0.22], [0.1, 0.22]]) b.add(G.box, VC.solid, ...P(fx, 0.18, fz), 0.07, 0.36, 0.07, 0, ry, 0, c);
+    b.add(G.box, VC.solid, ...P(0, 0.56, 0.4), 0.05, 0.05, 0.3, -0.7, ry, 0, c);
   };
   K.bike = (b, x, z, ry, { y = 0, col = pick(['#ff8aa8', '#39c8b0', '#f4e8c8', '#2a2a30', '#ffd23d', '#8ad8f0', '#c8302a']) } = {}) => {   // a beach cruiser standing (or ridden) along ry
     const ca = Math.cos(ry), sa = Math.sin(ry), P = (fz, fy) => [x + fz * sa, y + fy, z + fz * ca];
@@ -506,42 +553,95 @@ export function makeKit() {
     b.add(G.box, VC.metal, ...P(0.36, 1.0), 0.6, 0.04, 0.05, 0, ry, 0, '#c8ccd2');   // the swept-back bars
     b.add(G.box, VC.solid, ...P(-0.12, 0.8), 0.12, 0.05, 0.24, 0, ry, 0, '#3a2a1a');
   };
-  K.cyclist = (b, x, z, ry) => { K.bike(b, x, z, ry); K.person(b, x, z + 0.05 * Math.cos(ry), { y: 0.24, ry: ry + Math.PI, bag: false, phone: false, s: 0.95 }); };
+  K.cyclist = (b, x, z, ry, { y = 0 } = {}) => { K.bike(b, x, z, ry, { y }); K.person(b, x, z + 0.05 * Math.cos(ry), { y: y + 0.24, ry: ry + Math.PI, bag: false, phone: false, s: 0.95 }); };
   K.skater = (b, x, z, ry = chance(0.5) ? 0 : Math.PI) => K.person(b, x, z, { ry, skate: true, bag: false, phone: false, shades: chance(0.6), hat: pick(['cap', 'none', 'long']) });
 
   // ---------- cars ----------
-  // kind: 'sedan', 'suv', 'convertible' (top down, someone in it), 'classic' (long and low, its fins and chrome); dir: which way it faces (-1: toward you)
-  K.car = (b, x, z, dir = pick([-1, 1]), { kind = pick(['sedan', 'sedan', 'suv', 'suv', 'convertible', 'classic']), col = null, len = null, lit = chance(0.15), y = 0 } = {}) => {
-    const w = kind === 'classic' ? 1.95 : kind === 'suv' ? 1.9 : 1.8;
-    len = len || (kind === 'classic' ? rand(5.2, 5.6) : kind === 'suv' ? rand(4.6, 4.9) : rand(4.2, 4.7));
-    col = col || (kind === 'classic' ? pick(CLASSIC) : pick(CARS));
-    const lowH = kind === 'suv' ? 0.82 : kind === 'classic' ? 0.56 : 0.62, y0 = y + (kind === 'suv' ? 0.34 : 0.26);
-    b.block(VC.solid, col, x, y0, z, w, lowH, len);
-    if (kind === 'convertible') {   // the top down: the screen, the seats, a driver
-      b.add(G.box, VC.glow, x, y0 + lowH + 0.2, z - dir * len * 0.12, w - 0.2, 0.42, 0.04, -dir * 0.5, 0, 0, hdr('#3a4a5e', 0.8));
-      b.block(VC.solid, pick(['#e8dcc8', '#3a2a24', '#c8302a']), x, y0 + lowH - 0.05, z + dir * len * 0.08, w - 0.3, 0.42, len * 0.4);
-      if (chance(0.6)) K.person(b, x - 0.38, z + dir * len * 0.02, { seated: true, y: y0 - 0.45, ry: dir > 0 ? Math.PI : 0, s: 0.92, shades: true });
+  // A car is its body's side profile (length along the car, height up) extruded across its width, the cabin's glass on
+  // it a little narrower, the roof panel and the pillars over the glass; wheels and their rims, bumpers, the grille, the
+  // lamps, the mirrors, the plate. kind: 'sedan', 'suv', 'pickup', 'convertible' (top down, someone in it), 'classic'
+  // (long and low, fins and chrome, two-tone, whitewalls), 'taxi', 'police' (black and white, the light bar); dir: which
+  // way it faces (-1: toward you). The profiles below are for the car's nominal length L, front toward +u.
+  const CAR = {
+    sedan: { L: 4.6, W: 1.8, wr: 0.32, wu: 1.42, belt: 0.9, top: 1.4, hl: 0.66, tl: 0.76, body: [[-2.3, 0.3], [2.3, 0.3], [2.34, 0.6], [2.14, 0.78], [0.95, 0.9], [-1.5, 0.93], [-2.26, 0.9], [-2.36, 0.62]],
+      cab: [[0.97, 0.88], [0.34, 1.34], [-0.86, 1.36], [-1.54, 0.91]], roof: [[0.36, 1.33], [0.31, 1.39], [-0.85, 1.4], [-0.9, 1.35]], pil: [-0.26] },
+    suv: { L: 4.8, W: 1.92, wr: 0.38, wu: 1.5, belt: 1.08, top: 1.74, hl: 0.84, tl: 1.0, body: [[-2.4, 0.36], [2.4, 0.36], [2.44, 0.72], [2.3, 0.98], [1.2, 1.08], [-2.36, 1.1], [-2.44, 0.74]],
+      cab: [[1.22, 1.06], [0.62, 1.66], [-2.3, 1.68], [-2.36, 1.08]], roof: [[0.64, 1.65], [0.6, 1.72], [-2.32, 1.74], [-2.37, 1.67]], pil: [-0.35, -1.45] },
+    pickup: { L: 5.3, W: 1.95, wr: 0.38, wu: 1.75, belt: 1.1, top: 1.71, hl: 0.86, tl: 0.98, body: [[-2.65, 0.38], [2.65, 0.38], [2.68, 0.76], [2.52, 1.02], [1.15, 1.1], [-0.55, 1.1], [-0.55, 0.86], [-2.65, 0.86]],
+      cab: [[1.17, 1.08], [0.6, 1.64], [-0.45, 1.66], [-0.5, 1.08]], roof: [[0.62, 1.63], [0.58, 1.7], [-0.45, 1.71], [-0.5, 1.65]], pil: [] },
+    classic: { L: 5.4, W: 1.95, wr: 0.32, wu: 1.62, belt: 0.79, top: 1.28, hl: 0.6, tl: 0.78, body: [[-2.7, 0.28], [2.7, 0.28], [2.74, 0.58], [2.5, 0.72], [0.9, 0.78], [-1.6, 0.8], [-2.66, 0.94], [-2.74, 0.6]],
+      cab: [[0.92, 0.77], [0.55, 1.22], [-0.9, 1.24], [-1.4, 0.8]], roof: [[0.57, 1.21], [0.53, 1.27], [-0.88, 1.28], [-0.94, 1.23]], pil: [] },
+  };
+  CAR.taxi = CAR.police = CAR.convertible = CAR.sedan;
+  const profiles = new Map();
+  const extrude = (pts, w) => {   // a profile in (u, v) extruded across x, centred; its front toward local -z
+    const key = pts.flat().join(',') + '|' + w.toFixed(2);
+    if (!profiles.has(key)) {
+      const g = new THREE.ExtrudeGeometry(new THREE.Shape(pts.map(([u, v]) => new THREE.Vector2(u, v))), { depth: w, bevelEnabled: false });
+      g.translate(0, 0, -w / 2); g.rotateY(Math.PI / 2);
+      const n = g.index ? g.toNonIndexed() : g; n.computeVertexNormals(); profiles.set(key, n);
+    }
+    return profiles.get(key);
+  };
+  const _cm = new THREE.Matrix4(), _cq = new THREE.Quaternion(), _ce = new THREE.Euler(), _cv = new THREE.Vector3(), _cs = new THREE.Vector3();
+  const GLASS = hdr('#2e3a4e', 0.95);
+  K.car = (b, x, z, dir = pick([-1, 1]), { kind = pick(['sedan', 'sedan', 'sedan', 'suv', 'suv', 'pickup', 'convertible', 'classic']), col = null, len = null, lit = chance(0.15), y = 0, lo = false } = {}) => {
+    if (kind === 'sedan' && chance(0.06)) kind = chance(0.55) ? 'taxi' : 'police';
+    const C = CAR[kind], k = len ? len / C.L : rand(0.93, 1.04), W = C.W, hw = W / 2, F = C.L / 2;
+    col = col || (kind === 'classic' ? pick(CLASSIC) : kind === 'taxi' ? '#f2c230' : kind === 'police' ? '#141418' : pick(CARS));
+    const roofCol = kind === 'classic' && chance(0.6) ? '#f4f0e8' : kind === 'police' ? '#f4f4f0' : col, chrome = kind === 'classic' ? '#e8eaec' : '#2a2a2e';
+    const M0 = new THREE.Matrix4().makeRotationY(dir > 0 ? 0 : Math.PI).setPosition(x, y, z);
+    const prof = (pts, w, mat, c) => b.addM(extrude(pts, w), mat, _cm.copy(M0).multiply(new THREE.Matrix4().makeScale(1, 1, k)), c);
+    const part = (geo, mat, c, px, py, pu, sx, sy, sz, rx = 0, rz = 0) => { const m = new THREE.Matrix4().compose(_cv.set(px, py, -pu * k), _cq.setFromEuler(_ce.set(rx, 0, rz)), _cs.set(sx, sy, sz)); b.addM(geo, mat, m.premultiply(M0), c); };
+    const at = (px, py, pu) => new THREE.Vector3(px, py, -pu * k).applyMatrix4(M0);
+    prof(C.body, W, VC.solid, col);
+    if (lo) {   // further out in the traffic: the body, its glass and roof, the wheels as blocks, the lamps
+      prof(C.cab, W - 0.14, VC.glow, GLASS); prof(C.roof, W - 0.12, VC.solid, roofCol);
+      for (const u of [C.wu, -C.wu]) part(G.box, VC.solid, '#141414', 0, C.wr, u, W - 0.12, C.wr * 2, C.wr * 1.8);
+      for (const e of [-1, 1]) { part(G.box, VC.glow, hdr('#fff4d0', lit ? 2.2 : 0.5), e * (hw - 0.3), C.hl, F + 0.02, 0.36, 0.13, 0.04); part(G.box, VC.glow, hdr('#ff2a2a', lit ? 1.6 : 0.6), e * (hw - 0.24), C.tl, -F - 0.02, 0.34, 0.12, 0.04); }
+      return;
+    }
+    if (kind === 'convertible') {   // the top down: the screen, the seats and their headrests, a driver
+      part(G.box, VC.glow, GLASS, 0, 1.1, 0.8, W - 0.24, 0.42, 0.04, 0.55);
+      part(G.box, VC.solid, pick(['#e8dcc8', '#3a2a24', '#c8302a']), 0, 0.92, -0.35, W - 0.34, 0.12, 1.7);
+      for (const e of [-0.4, 0.4]) part(G.box, VC.solid, '#3a2a24', e, 1.12, -0.1, 0.5, 0.42, 0.12);
+      if (chance(0.6)) { const p = at(-0.4, 0, 0.05); K.person(b, p.x, p.z, { seated: true, y: y - 0.2, ry: dir > 0 ? 0 : Math.PI, s: 0.92, shades: true }); }
     } else {
-      const cabH = kind === 'suv' ? 0.62 : 0.5, cabL = kind === 'suv' ? len * 0.66 : kind === 'classic' ? len * 0.42 : len * 0.52;
-      b.block(VC.solid, kind === 'classic' ? pick(['#f4f0e8', col]) : col, x, y0 + lowH, z + dir * 0.12, w - 0.14, cabH, cabL);
-      b.box(VC.glow, hdr('#3a4a5e', 0.9), x, y0 + lowH + cabH * 0.55, z + dir * 0.12, w - 0.1, cabH * 0.55, cabL - 0.08);
+      prof(C.cab, W - 0.14, VC.glow, GLASS);
+      prof(C.roof, W - 0.12, VC.solid, roofCol);
+      const px = hw - 0.065, [a0, a1, a2, a3] = C.cab;
+      for (const e of [-1, 1]) {   // the pillars over the glass
+        for (const [p, q] of [[a0, a1], [a2, a3]]) { const A = at(e * px, p[1], p[0]), B = at(e * px, q[1], q[0]); beam(b, VC.solid, A.x, A.y, A.z, B.x, B.y, B.z, 0.08, roofCol); }
+        for (const u of C.pil) part(G.box, VC.solid, roofCol, e * px, (C.belt + C.top) / 2, u, 0.04, C.top - C.belt, 0.1);
+      }
+      if (kind === 'pickup') { for (const e of [-1, 1]) part(G.box, VC.solid, col, e * (hw - 0.05), 0.99, -1.6, 0.1, 0.26, 2.1); part(G.box, VC.solid, col, 0, 0.99, -2.62, W - 0.1, 0.26, 0.08); part(G.box, VC.solid, '#2a2a2e', 0, 0.87, -1.6, W - 0.2, 0.02, 2.1); }
     }
-    if (kind === 'classic') {   // chrome bumpers, the tail fins
-      for (const e of [-1, 1]) b.box(VC.metal, '#e8eaec', x, y0 + 0.12, z + e * (len / 2 + 0.04), w + 0.04, 0.14, 0.1);
-      for (const e of [-1, 1]) b.add(G.box, VC.solid, x + e * (w / 2 - 0.12), y0 + lowH + 0.08, z + dir * (len / 2 - 0.5), 0.1, 0.3, 1.0, -dir * 0.3, 0, 0, col);
+    if (kind === 'police') {   // black and white: the doors white, the light bar on the roof
+      for (const e of [-1, 1]) part(G.box, VC.solid, '#f4f4f0', e * (hw + 0.004), 0.62, -0.2, 0.02, 0.5, 2.3);
+      part(G.box, VC.solid, '#1a1a1e', 0, C.top + 0.07, -0.3, 1.25, 0.1, 0.26);
+      part(G.box, VC.glow, hdr('#ff2a2a', lit ? 3 : 1.6), -0.36, C.top + 0.08, -0.3, 0.5, 0.11, 0.24); part(G.box, VC.glow, hdr('#2a5aff', lit ? 3 : 1.6), 0.36, C.top + 0.08, -0.3, 0.5, 0.11, 0.24);
+    } else if (kind === 'taxi') part(G.box, VC.glow, hdr('#fff0b0', 1.3), 0, C.top + 0.13, -0.3, 0.75, 0.22, 0.32);
+    for (const u of [C.wu, -C.wu]) for (const e of [-1, 1]) {   // the wheels: tyres, their rims (whitewalls on the classics)
+      part(G.cyl8, VC.solid, '#141414', e * (hw - 0.11), C.wr, u, C.wr * 2, 0.24, C.wr * 2, 0, Math.PI / 2);
+      part(G.cyl8, kind === 'classic' ? VC.solid : VC.metal, kind === 'classic' ? '#f4f4f0' : '#b8bcc4', e * (hw + 0.012), C.wr, u, C.wr * 1.25, 0.02, C.wr * 1.25, 0, Math.PI / 2);
+      if (kind === 'classic') part(G.cyl8, VC.metal, '#e8eaec', e * (hw + 0.02), C.wr, u, C.wr * 0.8, 0.02, C.wr * 0.8, 0, Math.PI / 2);
     }
-    for (const dz of [-len * 0.33, len * 0.33]) for (const e of [-1, 1]) b.cyl(VC.solid, '#141414', x + e * (w / 2 - 0.08), y + (kind === 'suv' ? 0.36 : 0.3), z + dz, kind === 'suv' ? 0.36 : 0.3, 0.22, 'cyl8', 0, Math.PI / 2);
-    for (const e of [-1, 1]) { b.box(VC.glow, hdr('#ff2a2a', lit ? 1.6 : 0.6), x + e * 0.62, y0 + lowH - 0.18, z + dir * (len / 2 + 0.01), 0.3, 0.14, 0.04); b.box(VC.glow, hdr('#fff4d0', lit ? 2.2 : 0.35), x + e * 0.6, y0 + lowH - 0.22, z - dir * (len / 2 + 0.01), 0.3, 0.14, 0.04); }
+    for (const e of [-1, 1]) {
+      part(G.box, VC.glow, hdr('#fff4d0', lit ? 2.2 : 0.5), e * (hw - 0.3), C.hl, F + 0.02, 0.36, 0.13, 0.04);   // the headlamps, the tail lamps, the mirrors
+      part(G.box, VC.glow, hdr('#ff2a2a', lit ? 1.6 : 0.6), e * (hw - 0.24), C.tl, -F - 0.02, 0.34, 0.12, 0.04);
+      if (kind !== 'convertible') part(G.box, VC.solid, col, e * (hw + 0.09), C.belt + 0.06, C.cab[0][0] - 0.1, 0.16, 0.1, 0.07);
+    }
+    part(G.box, kind === 'classic' ? VC.metal : VC.solid, chrome, 0, 0.42, F + 0.04, W - 0.04, 0.15, 0.12);   // the bumpers, the grille, the plate
+    part(G.box, kind === 'classic' ? VC.metal : VC.solid, chrome, 0, 0.42, -F - 0.04, W - 0.04, 0.15, 0.12);
+    part(G.box, kind === 'classic' ? VC.metal : VC.solid, kind === 'classic' ? '#c8ccd2' : '#1a1a1e', 0, C.hl - 0.04, F + 0.015, W * 0.42, 0.17, 0.04);
+    part(G.box, VC.solid, '#e8e8f0', 0, 0.56, -F - 0.03, 0.32, 0.16, 0.02);
   };
   K.lowrider = (b, x, z, dir = pick([-1, 1]), { up = chance(0.25) } = {}) => {   // a long, low candy-painted cruiser on wire wheels; some sit with the nose up on the hydraulics
     const col = pick(['#c8104a', '#2a3ab4', '#7a1ab4', '#0a8a8a', '#e8a018', '#1a1a1e', '#d82a8a']);
     K.place(b, (t) => {
-      t.block(VC.metal, col, 0, 0.26, 0, 1.92, 0.56, 5.5);
-      t.block(VC.metal, col, 0, 0.82, dir * 0.3, 1.8, 0.44, 2.4);
-      t.box(VC.glow, hdr('#2a3446', 0.9), 0, 1.02, dir * 0.3, 1.82, 0.26, 2.3);
-      t.box(VC.metal, '#e8eaec', 0, 0.3, -dir * 2.76, 1.9, 0.14, 0.06);
-      for (const dz of [-1.8, 1.8]) for (const e of [-1, 1]) { t.cyl(VC.solid, '#f4f4f0', e * 0.88, 0.3, dz, 0.3, 0.2, 'cyl', 0, Math.PI / 2); t.cyl(VC.metal, '#e8eaec', e * 0.99, 0.3, dz, 0.2, 0.02, 'cyl', 0, Math.PI / 2); }
-      for (const e of [-1, 1]) t.box(VC.glow, hdr('#fff4d0', 0.5), e * 0.7, 0.42, -dir * 2.76, 0.3, 0.12, 0.04);
+      K.car(t, 0, 0, dir, { kind: 'classic', col, lit: false, y: -0.06, len: 5.4 });
+      for (const e of [-1, 1]) t.box(VC.metal, '#e8eaec', e * 0.99, 0.55, 0, 0.02, 0.05, 4.8);   // the chrome strip down each side
+      for (const u of [1.62, -1.62]) for (const e of [-1, 1]) for (let j = 0; j < 6; j++) t.add(G.box, VC.metal, e * 1.0, 0.26, -u * dir, 0.01, 0.4, 0.02, (j * Math.PI) / 6, 0, 0, '#d8dce0');   // the wire wheels' spokes
     }, new THREE.Matrix4().makeRotationX(up ? dir * 0.12 : 0).setPosition(x, up ? 0.32 : 0, z));
   };
   K.carRow = (b, x, z0, z1, { gaps = [], dir = null, n = 99, p = 0.75, kinds = null, lit = null } = {}) => {   // cars parked nose to tail along the kerb lane
@@ -565,7 +665,11 @@ export function makeKit() {
     for (let k = 0; k < 7; k++) b.sph(VC.glow, hdr(pick(['#ffd23d', '#ff5a5a', '#5aff8a', '#5ac8ff']), 2.2), fx + side * 0.6, 3.1 - Math.sin((k / 6) * Math.PI) * 0.25, z - dir * (2 - k * 0.6), 0.06, true);   // string lights
     for (let k = 0; k < 6; k++) beam(b, VC.solid, fx + side * 0.6, 3.1 - Math.sin((k / 6) * Math.PI) * 0.25, z - dir * (2 - k * 0.6), fx + side * 0.6, 3.1 - Math.sin(((k + 1) / 6) * Math.PI) * 0.25, z - dir * (2 - (k + 1) * 0.6), 0.015, '#1a1a1a');
     for (const e of [0, 6]) beam(b, VC.solid, fx + side * 0.6, 3.1, z - dir * (2 - e * 0.6), fx, 2.9, z - dir * (2 - e * 0.6), 0.015, '#1a1a1a');
-    for (const dz of [-2.2, 1.8, 3.8]) for (const e of [-1, 1]) b.cyl(VC.solid, '#141414', x + e * 1.0, 0.42, z + dz * dir, 0.42, 0.24, 'cyl8', 0, Math.PI / 2);
+    for (const dz of [-2.2, 1.8, 3.8]) for (const e of [-1, 1]) { b.cyl(VC.solid, '#141414', x + e * 1.0, 0.42, z + dz * dir, 0.42, 0.24, 'cyl8', 0, Math.PI / 2); b.cyl(VC.metal, '#c8ccd2', x + e * 1.13, 0.42, z + dz * dir, 0.24, 0.03, 'cyl8', 0, Math.PI / 2); }
+    for (const e of [-1, 1]) b.box(VC.glow, hdr('#3a4a5e', 0.9), x + e * (w / 2 + 0.01), 1.75, z + dir * 3.9, 0.03, 0.6, 1.1);   // the cab's side windows
+    K.board(b, K.goodsRects[GI.taqueria], fx + side * 0.03, 1.95, z + dir * 1.9, 1.3, 1.1, 1, 0, -face(side), 0);   // the menu board by the window
+    b.box(VC.solid, '#c8c0b4', fx + side * 0.3, 1.45, z - dir * 0.6, 0.6, 0.06, 2.8);   // the counter under the window
+    b.cyl(VC.metal, '#b8bcc4', x, 3.35, z - dir * 1.5, 0.25, 0.4, 'cyl8'); K.smokeBuf.push([x, 3.7, z - dir * 1.5]);   // the vent over the grill, its smoke
     for (let k = randi(2, 5); k > 0; k--) K.person(b, x + side * rand(1.9, 3.2), z - dir * rand(-1.8, 2.4), { ry: side < 0 ? Math.PI / 2 : -Math.PI / 2 });
     K.pool(b, fx + side * 1.6, z - dir * 0.6, 4, 5, hdr('#ffd9a0', 0.14));
   };
@@ -579,27 +683,39 @@ export function makeKit() {
     K.sign(b, 'HOLLYWOOD TOURS', { w: 512, h: 96, color: '#ffd23d', bg: '#1a1a24', font: BLADE, size: 0.56, k: 1.2 }, x + 1.01, 1.1, z, 3.6, 0.68, 1, 0, Math.PI / 2, 0);
     for (const dz of [-2.4, 2.4]) for (const e of [-1, 1]) b.cyl(VC.solid, '#141414', x + e * 0.9, 0.4, z + dz, 0.4, 0.22, 'cyl8', 0, Math.PI / 2);
   };
-  K.metroBus = (b, x, z, dir = 1) => {   // a Metro Local bus: orange below, silver above, its sign glowing amber
+  K.metroBus = (b, x, z, dir = 1) => {   // a Metro Local bus: orange below, silver above; the windows between their pillars, the doors on the kerb side, the windscreen and its amber sign, mirrors, the bike rack, the wheels and hubs
+    const s = Math.sign(x) || 1, fz = z - dir * 6;
     b.block(VC.solid, '#d8dce0', x, 0.32, z, 2.55, 2.9, 12);
     b.box(VC.solid, '#e8652a', x, 0.95, z, 2.57, 1.1, 12);
-    for (const e of [-1, 1]) { b.box(VC.glow, hdr('#2a3446', 1), x + e * 1.28, 2.15, z, 0.03, 1.0, 10.6); b.box(VC.glow, hdr('#fff0d0', 0.7), x + e * 1.285, 2.15, z + rand(-3, 3), 0.03, 0.9, 3.2); }
-    b.box(VC.glow, hdr('#2a3446', 1), x, 2.0, z - dir * 6.01, 2.3, 1.4, 0.03);
-    b.box(VC.glow, hdr('#ffb02a', 1.8), x, 2.95, z - dir * 6.02, 1.6, 0.26, 0.03);
-    for (const e of [-1, 1]) b.box(VC.glow, hdr('#fff4d0', 1.6), x + e * 0.9, 0.7, z - dir * 6.02, 0.3, 0.16, 0.03);
-    for (const dz of [-4, 3.8]) for (const e of [-1, 1]) b.cyl(VC.solid, '#141414', x + e * 1.15, 0.5, z + dz, 0.5, 0.36, 'cyl8', 0, Math.PI / 2);
-    b.box(VC.metal, '#8a9098', x, 3.32, z + dir * 1.5, 1.6, 0.25, 3);
+    b.box(VC.solid, '#b8bcc4', x, 3.24, z, 2.4, 0.08, 11.6);
+    for (const e of [-1, 1]) {
+      b.box(VC.glow, hdr('#2a3446', 1), x + e * 1.28, 2.15, z, 0.03, 1.0, 10.6); b.box(VC.glow, hdr('#fff0d0', 0.7), x + e * 1.285, 2.15, z + rand(-3, 3), 0.03, 0.9, 3.2);
+      for (let k = 0; k <= 8; k++) b.box(VC.solid, '#c8ccd2', x + e * 1.297, 2.15, z - 5.3 + k * 1.325, 0.02, 1.04, 0.1);
+      b.box(VC.solid, '#3a3a40', x + e * 1.29, 0.42, z, 0.02, 0.2, 11.4);
+      beam(b, VC.metal, x + e * 1.28, 2.7, fz + dir * 0.3, x + e * 1.6, 2.5, fz - dir * 0.2, 0.05, '#1a1a1e'); b.box(VC.solid, '#1a1a1e', x + e * 1.62, 2.2, fz - dir * 0.25, 0.08, 0.5, 0.25);   // the mirrors
+    }
+    for (const dz of [-4.4, 1.6]) { b.box(VC.glow, hdr('#3a4a5e', 1.1), x + s * 1.29, 1.55, z + dir * dz, 0.03, 2.3, 1.15); b.box(VC.solid, '#5a5e66', x + s * 1.3, 1.55, z + dir * dz, 0.02, 2.3, 0.06); }   // the doors
+    b.box(VC.glow, hdr('#2a3446', 1), x, 2.0, fz - dir * 0.01, 2.3, 1.4, 0.03);
+    b.box(VC.glow, hdr('#ffb02a', 1.8), x, 2.95, fz - dir * 0.02, 1.6, 0.26, 0.03);
+    for (const e of [-1, 1]) { b.box(VC.glow, hdr('#fff4d0', 1.6), x + e * 0.9, 0.7, fz - dir * 0.02, 0.3, 0.16, 0.03); b.add(G.box, VC.solid, x + e * 0.4, 1.4, fz - dir * 0.03, 0.04, 0.7, 0.02, 0, 0, e * 0.6, '#1a1a1e'); }   // the lamps, the wipers
+    b.box(VC.metal, '#5a5e64', x, 0.85, fz - dir * 0.25, 1.6, 0.06, 0.5); for (const e of [-0.5, 0.5]) b.box(VC.metal, '#5a5e64', x + e, 0.95, fz - dir * 0.45, 0.04, 0.3, 0.04);   // the bike rack, folded
+    for (const dz of [-4, 3.8]) for (const e of [-1, 1]) { b.cyl(VC.solid, '#141414', x + e * 1.15, 0.5, z + dz, 0.5, 0.36, 'cyl8', 0, Math.PI / 2); b.cyl(VC.metal, '#b8bcc4', x + e * 1.34, 0.5, z + dz, 0.3, 0.03, 'cyl8', 0, Math.PI / 2); }
+    b.box(VC.metal, '#8a9098', x, 3.4, z + dir * 1.5, 1.6, 0.3, 3); b.box(VC.solid, '#5a5e64', x, 1.6, z + dir * 6.01, 2.0, 0.8, 0.03);   // the roof unit, the engine's grille at the back
   };
 
   // ---------- street furniture ----------
   // kind: 'cobra' (the city's steel pole, the cobra head out over the parking lane), 'twin' (downtown's old iron post
   // with its two acorn globes), 'deco' (Hollywood Boulevard's lantern with the star on top)
-  K.lamp = (b, x, z, side, { kind = 'cobra', h = null, col = '#ffe2b0', k = 2.2, pool = 0.1 } = {}) => {
+  K.lamp = (b0, x, z, side, { kind = 'cobra', h = null, col = '#ffe2b0', k = 2.2, pool = 0.1, y = 0 } = {}) => {
+    const b = y ? { cyl: (m, c, px, py, pz, ...r) => b0.cyl(m, c, px, py + y, pz, ...r), box: (m, c, px, py, pz, ...r) => b0.box(m, c, px, py + y, pz, ...r), sph: (m, c, px, py, pz, ...r) => b0.sph(m, c, px, py + y, pz, ...r),
+      add: (g, m, px, py, pz, ...r) => b0.add(g, m, px, py + y, pz, ...r), addM: (g, m, M, c) => b0.addM(g, m, new THREE.Matrix4().makeTranslation(0, y, 0).multiply(M), c) } : b0;
     if (kind === 'cobra') {
       const H = h || 9.0, reach = 2.6, ex = x - side * reach;
-      b.cyl(VC.metal, '#8a8e94', x, H / 2, z, 0.1, H, 'cyl8');
+      b.cyl(VC.metal, '#8a8e94', x, H / 2, z, 0.1, H, 'cyl8'); b.cyl(VC.metal, '#7a7e84', x, 0.4, z, 0.2, 0.8, 'cyl8');   // the pole on its base
       beam(b, VC.metal, x, H - 0.6, z, x - side * reach * 0.55, H + 0.2, z, 0.07, '#8a8e94');
       beam(b, VC.metal, x - side * reach * 0.55, H + 0.2, z, ex, H + 0.05, z, 0.07, '#8a8e94');
-      b.add(G.box, VC.metal, ex, H - 0.02, z, 0.95, 0.2, 0.42, 0, 0, side * 0.05, '#9aa0a6');
+      b.add(G.box, VC.metal, ex + side * 0.12, H - 0.02, z, 0.75, 0.2, 0.42, 0, 0, side * 0.05, '#9aa0a6');   // the cobra head: its hood tapering to the nose, the lens under it
+      b.add(G.box, VC.metal, ex - side * 0.36, H - 0.05, z, 0.35, 0.14, 0.3, 0, 0, side * 0.12, '#9aa0a6');
       b.box(VC.glow, hdr(col, k), ex, H - 0.14, z, 0.8, 0.05, 0.32);
       if (pool) K.pool(b, ex, z, 7, 7, hdr(col, pool));
     } else if (kind === 'twin') {
@@ -627,11 +743,51 @@ export function makeKit() {
       if (z < z0 || z > z1) continue;
       b.cyl(VC.solid, '#5a4632', x, (h + 0.8) / 2, -z, 0.15, h + 0.8, 'cyl6');
       b.box(VC.solid, '#5a4632', x, h, -z, 1.9, 0.14, 0.14);
-      for (const dx of [-0.7, 0, 0.7]) b.cyl(VC.solid, '#c8d4c8', x + dx, h + 0.1, -z, 0.04, 0.14, 'cyl6');
-      if (chance(0.45)) b.cyl(VC.metal, '#8a9096', x + Math.sign(x) * 0.32, h - 1.0, -z, 0.3, 1.0, 'cyl8');
+      for (const e of [-1, 1]) beam(b, VC.metal, x, h - 0.6, -z, x + e * 0.55, h - 0.05, -z, 0.04, '#3a3a3e');   // the crossarm's braces
+      for (const dx of [-0.7, 0, 0.7]) { b.cyl(VC.solid, '#c8d4c8', x + dx, h + 0.12, -z, 0.05, 0.18, 'cyl6'); b.cyl(VC.solid, '#c8d4c8', x + dx, h + 0.2, -z, 0.08, 0.03, 'cyl6'); }   // the insulators and their skirts
+      b.cyl(VC.solid, '#5a4632', x, h - 1.6, -z, 0.17, 0.12, 'cyl6');
+      if (chance(0.45)) { const tx = x + Math.sign(x) * 0.34; b.cyl(VC.metal, '#8a9096', tx, h - 1.0, -z, 0.3, 1.0, 'cyl8'); b.cyl(VC.metal, '#7a8086', tx, h - 0.47, -z, 0.32, 0.06, 'cyl8'); for (const e of [-0.12, 0.12]) b.cyl(VC.solid, '#a8b0a8', tx + e, h - 0.36, -z, 0.035, 0.2, 'cyl6'); }   // a transformer can, its lid and bushings
+      if (chance(0.3)) { b.box(VC.solid, '#e8e8e0', x - Math.sign(x) * 0.16, 2.6, -z, 0.02, 0.3, 0.2); b.box(VC.solid, '#e8e8e0', x - Math.sign(x) * 0.16, 2.2, -z, 0.02, 0.12, 0.2); }   // the pole's tags
     }
   };
   K.span = (b, z, x = 10.6, h = 10.6) => { for (const dy of [1.6, 2.1]) b.box(VC.metal, '#1a1a1e', 0, h + dy, -z, 2 * x, 0.03, 0.03); for (const e of [-1, 1]) b.cyl(VC.solid, '#5a4632', e * x, h + 1.4, -z, 0.15, 1.6, 'cyl6'); };   // wires over the street at 12 m
+  // a signal at the corner: the pole on its base, the mast arm out over the parking lane (well clear of the track), the
+  // heads facing up the street (one lamp lit), the street's plate on the arm, the walk signal and its button on the pole
+  K.signal = (b, x, z, side, { street = randi(0, STREETS.length - 1) } = {}) => {
+    const H = 5.9, ex = x - side * 3.0;
+    b.cyl(VC.metal, '#8a8e94', x, H / 2, z, 0.12, H, 'cyl8'); b.cyl(VC.metal, '#7a7e84', x, 0.35, z, 0.24, 0.7, 'cyl8');
+    beam(b, VC.metal, x, H - 0.1, z, ex, H - 0.1, z, 0.1, '#8a8e94'); beam(b, VC.metal, x, H - 1.1, z, x - side * 1.4, H - 0.15, z, 0.05, '#8a8e94');
+    const on = randi(0, 2);
+    for (const hx of [ex + side * 0.3, x - side * 1.6]) {
+      b.box(VC.solid, '#d8b030', hx, H - 0.75, z, 0.38, 1.1, 0.3); b.box(VC.solid, '#1a1a1e', hx, H - 0.75, z + 0.16, 0.42, 1.14, 0.02);
+      ['#ff2a1a', '#ffb01a', '#3aff7a'].forEach((c, k) => { b.cyl(VC.glow, hdr(c, k === on ? 3.0 : 0.25), hx, H - 0.42 - k * 0.34, z + 0.18, 0.11, 0.03, 'cyl8', Math.PI / 2); b.box(VC.solid, '#1a1a1e', hx, H - 0.3 - k * 0.34, z + 0.25, 0.26, 0.02, 0.14); });
+    }
+    K.board(b, K.streetRects[street], x - side * 2.2, H + 0.25, z + 0.06, 1.6, 0.36, 1, 0, 0, 0);
+    b.box(VC.solid, '#2a2a2e', x, 2.7, z + 0.18, 0.34, 0.34, 0.2); b.box(VC.glow, hdr(on === 0 ? '#ff7a2a' : '#f4f4f0', 1.6), x, 2.7, z + 0.29, 0.22, 0.22, 0.02);
+    b.box(VC.solid, '#d8b030', x - side * 0.14, 1.1, z, 0.08, 0.16, 0.1);
+  };
+  // the crossing at the corner: the bars across the parking lanes, the stop line, the ramps in the kerb
+  K.crosswalk = (b, z) => {
+    for (const s of [-1, 1]) {
+      for (let x = EDGE + 0.4; x < KERB - 0.2; x += 1.0) b.box(VC.solid, '#f4f0e8', s * x, 0.042, -z, 0.5, 0.01, 3.0);
+      b.box(VC.solid, '#f4f0e8', s * (EDGE + KERB) / 2, 0.042, -z - 2.5, KERB - EDGE - 0.2, 0.01, 0.3);
+      b.box(VC.solid, '#c8b030', s * (KERB + 0.6), 0.041, -z, 1.0, 0.01, 1.6);   // the ramp's yellow tiles
+    }
+  };
+  K.stopSign = (b, x, z) => {   // the red octagon on its post
+    b.cyl(VC.metal, '#8a8e94', x, 1.3, z, 0.035, 2.6, 'cyl6');
+    b.add(G.cyl8, VC.solid, x, 2.55, z + 0.03, 0.8, 0.03, 0.8, Math.PI / 2, 0, Math.PI / 8, '#c81e1e');
+    K.sign(b, 'STOP', { w: 128, h: 64, color: '#ffffff', font: SANS, weight: 700, size: 0.7, k: 1.0 }, x, 2.55, z + 0.05, 0.62, 0.3, 1, 0, 0, 0);
+  };
+  // the small things on a pavement: meters at the kerb, a cluster of news racks, a bin, the drain in the gutter, manholes
+  K.streetBits = (b, s, z0, z1, { meters = false, news = chance(0.5), bin = chance(0.6), gaps = [] } = {}) => {
+    const free = (z) => !gaps.some(([a, c]) => z > a - 1 && z < c + 1);
+    if (meters) for (let z = z0 + rand(2, 5); z < z1 - 1; z += rand(5.6, 7.2)) if (free(z)) { b.cyl(VC.metal, '#5a5e64', s * 7.05, 0.55, -z, 0.04, 1.1, 'cyl6'); b.box(VC.metal, '#3a3e44', s * 7.05, 1.22, -z, 0.2, 0.3, 0.16); b.box(VC.glow, hdr('#8affb0', 0.8), s * 7.05 - s * 0.09, 1.28, -z, 0.02, 0.08, 0.1); }
+    if (news) { const z = rand(z0 + 6, z1 - 6); if (free(z)) for (let k = 0; k < randi(2, 4); k++) { const c = pick(['#1a4a8a', '#c8202a', '#f4f0e8', '#2a6a3a', '#e8c030']); b.block(VC.solid, c, s * 7.6, 0.35, -z - k * 0.52, 0.45, 0.7, 0.45); b.box(VC.glow, hdr('#e8e4d8', 0.7), s * 7.6 - s * 0.23, 0.85, -z - k * 0.52, 0.02, 0.22, 0.32); for (const e of [-0.15, 0.15]) b.box(VC.metal, '#3a3a3e', s * 7.6, 0.17, -z - k * 0.52 + e, 0.4, 0.34, 0.04); } }
+    if (bin) { const z = rand(z0 + 4, z1 - 4); if (free(z)) { b.cyl(VC.solid, pick(['#2a4a3a', '#4a3a2a', '#3a3a40']), s * 7.4, 0.5, -z, 0.3, 1.0, 'cyl8'); b.cyl(VC.solid, '#2a2a2e', s * 7.4, 1.04, -z, 0.33, 0.08, 'cyl8'); } }
+    for (let k = randi(0, 2); k > 0; k--) b.add(G.cyl, VC.metal, s * rand(4.2, 6.0), 0.036, -rand(z0 + 2, z1 - 2), 0.7, 0.01, 0.7, 0, 0, 0, '#3a3a3e');
+    if (chance(0.5)) b.box(VC.solid, '#141416', s * (KERB - 0.02), 0.07, -rand(z0 + 3, z1 - 3), 0.06, 0.12, 1.4);   // the storm drain's slot
+  };
   K.parkingSigns = (b, x, z, { n = randi(2, 3) } = {}) => {   // the stack of rules on one pole, read from the top down
     b.cyl(VC.metal, '#8a8e94', x, 1.75, z, 0.04, 3.5, 'cyl6');
     [0, 1, 2, 3].sort(() => Math.random() - 0.5).slice(0, n).forEach((i, k) => K.board(b, K.plateRects[i], x, 3.15 - k * 0.66, z + 0.05, 0.6, 0.6, 1, 0, 0, 0));
@@ -641,8 +797,15 @@ export function makeKit() {
     K.board(b, K.streetRects[i], x, 3.35, z, 1.5, 0.34, 1, 0, 0, 0);
     K.board(b, K.streetRects[j], x, 3.76, z, 1.5, 0.34, 1, 0, face(side), 0);
   };
-  K.busStop = (b, x, z, side) => {   // the Metro sign on its post; a bench with an advert along its back, facing the street
+  K.busStop = (b, x, z, side, { shelter = chance(0.5) } = {}) => {   // the Metro sign on its post; a bench with an advert along its back, facing the street; a shelter over some
     b.cyl(VC.metal, '#8a8e94', x, 1.6, z, 0.04, 3.2, 'cyl6');
+    if (shelter) {   // its roof on two posts, the glass at its end, the lamp under it
+      const sx = x + side * 0.95, sz = z - 2.6;
+      for (const e of [-1, 1]) b.box(VC.metal, '#5a5e64', sx + side * 0.6, 1.3, sz + e * 1.5, 0.1, 2.6, 0.1);
+      b.box(VC.metal, '#5a5e64', sx, 2.65, sz, 1.6, 0.1, 3.4); b.box(VC.solid, '#e8e4dc', sx, 2.74, sz, 1.5, 0.06, 3.3);
+      b.box(VC.glow, hdr('#b8c8d8', 0.6), sx, 1.4, sz - 1.5, 1.2, 1.9, 0.03);
+      b.box(VC.glow, hdr('#fff4e0', 1.4), sx, 2.58, sz, 0.8, 0.03, 0.2);
+    }
     K.sign(b, 'M', { w: 128, h: 128, color: '#ffffff', bg: '#141414', font: SANS, weight: 700, size: 0.8, k: 1.1 }, x, 3.0, z + 0.03, 0.5, 0.5, 1, 0, 0, 0);
     K.sign(b, 'METRO 2 · 302', { w: 256, h: 64, color: '#141414', bg: '#e8e4dc', font: SANS, weight: 700, size: 0.6, k: 0.9 }, x, 2.6, z + 0.03, 0.8, 0.2, 1, 0, 0, 0);
     const bz = z - 2.6, bx = x + side * 0.9;
@@ -658,10 +821,12 @@ export function makeKit() {
     b.cyl(VC.metal, '#c8ccd2', x, 0.4, z + 0.24, 0.1, 0.14, 'cyl8', Math.PI / 2);
   };
   K.mailbox = (b, x, z) => { b.block(VC.solid, '#2a4a9a', x, 0.35, z, 0.52, 0.8, 0.52); b.cyl(VC.solid, '#2a4a9a', x, 1.15, z, 0.26, 0.52, 'cyl8', Math.PI / 2); for (const e of [-1, 1]) b.box(VC.solid, '#1a2a5a', x + e * 0.2, 0.17, z, 0.06, 0.34, 0.46); };
-  K.bench = (b, x, z, side, { people = chance(0.35) } = {}) => {
-    b.box(VC.solid, '#6a5038', x, 0.45, z, 0.5, 0.08, 1.8); b.box(VC.solid, '#6a5038', x + side * 0.24, 0.75, z, 0.06, 0.45, 1.8);
-    for (const e of [-1, 1]) b.box(VC.metal, '#2a2e2a', x, 0.22, z + e * 0.75, 0.5, 0.44, 0.06);
-    if (people) K.person(b, x - side * 0.05, z + rand(-0.5, 0.5), { seated: true, ry: side < 0 ? -Math.PI / 2 : Math.PI / 2 });
+  K.bench = (b, x, z, side, { people = chance(0.35), y = 0, along = false } = {}) => {   // slats on cast-iron ends; side: where its back is (along: lying along x, its back toward -z)
+    const th = along ? 0 : -side * Math.PI / 2, F = frame(b, x, y, z, 1, th);   // (local: the seat along x, its back at local -z)
+    for (const dz of [-0.16, 0, 0.16]) F.box(VC.solid, '#6a5038', 0, 0.45, dz, 1.8, 0.04, 0.12);
+    for (const dy of [0.62, 0.78]) F.box(VC.solid, '#6a5038', 0, dy, -0.25, 1.8, 0.1, 0.035);
+    for (const e of [-1, 1]) { F.box(VC.metal, '#2a2e2a', e * 0.78, 0.22, 0, 0.06, 0.44, 0.5); F.box(VC.metal, '#2a2e2a', e * 0.78, 0.62, -0.25, 0.06, 0.4, 0.05); F.box(VC.metal, '#2a2e2a', e * 0.78, 0.6, 0.05, 0.05, 0.05, 0.4); }
+    if (people) { const p = F.at(rand(-0.5, 0.5), 0, 0.02); K.person(b, p.x, p.z, { seated: true, y: y - 0.05, ry: th + Math.PI }); }
   };
   K.bin = (b, x, z) => { b.cyl(VC.solid, '#3a4a3e', x, 0.55, z, 0.32, 1.1, 'cyl8'); b.cyl(VC.solid, '#2a3a2e', x, 1.14, z, 0.34, 0.08, 'cyl8'); };
   // the parking lane (road over the track's side strip), the kerb (painted red here and there), the pavement out to x1
@@ -688,69 +853,105 @@ export function makeKit() {
   const xz = (F, x, z) => { const p = F.at(x, 0, z); return [p.x, p.z]; };   // where a point of a frame's ground lies in the chunk
   K.xz = xz;
   // a Spanish Colonial Revival house, built in its own frame (local x along the street, z out of the front toward the
-  // track, y up): white or cream stucco, red tile on a hip or a gable, round-headed windows below, iron balconettes
-  // above, the arched door, sometimes a stair tower, bougainvillea spilling over a corner
+  // track, y up): white or cream stucco on a plinth, red tile on a hip or a gable over a dark fascia and its rafter tails,
+  // round-headed windows behind iron grilles below, shutters or iron balconettes above, the arched door in its surround
+  // under a little tile hood, sometimes a stair tower, bougainvillea spilling over a corner
   K.villa = (b, s, xf, zc, { w = rand(11, 15), d = rand(10, 13), floors = randi(1, 2), col = pick(STUCCO), lit = 0.5, tower = chance(0.3), hip = chance(0.5), bougain = chance(0.65), y = 0 } = {}) => {
-    const F = frame(b, s * xf, y, zc, 1, face(s)), sunny = s > 0, FH = 3.3, top = floors * FH + 0.5, hw = w / 2, fc = shade(col, 0.86);
+    const F = frame(b, s * xf, y, zc, 1, face(s)), sunny = s > 0, FH = 3.3, top = floors * FH + 0.5, hw = w / 2, fc = shade(col, 0.86), wood = pick(['#4a2e1e', '#5a3a2a', '#3a2a20']);
     const foot = 1 + y * 0.6;   // carried down into the ground (deeper on a slope)
     F.addM(K.tiledBox(w, top + foot, d, 2.5), K.stuccoMat, new THREE.Matrix4().makeTranslation(0, (top - foot) / 2, -d / 2), col);
+    F.box(VC.solid, shade(col, 0.8), 0, 0.2, 0.03, w + 0.06, 0.4, 0.08);   // the plinth
     const rh = rand(1.8, 2.6);
     if (hip) F.addM(hipRoof(w + 0.9, d + 0.9, rh), K.tileMat, new THREE.Matrix4().makeTranslation(0, top, 0.45), '#ffffff');
     else { F.addM(gableRoof(w + 0.7, d + 0.7, rh), K.tileMat, new THREE.Matrix4().makeTranslation(0, top, 0.35), '#ffffff'); F.addM(gableFace(w - 0.1, rh - 0.1), K.stuccoMat, new THREE.Matrix4().makeTranslation(0, top, 0.02), col); }
-    const nW = Math.max(2, Math.floor((w - 2.2) / 2.6)), door = randi(0, nW - 1);
+    const ez = hip ? 0.45 : 0.35;
+    F.box(VC.solid, wood, 0, top - 0.07, ez - 0.03, w + 0.8, 0.14, 0.06);   // the fascia and the rafter tails under the eave
+    for (let x = -hw + 0.2; x <= hw - 0.2; x += 0.6) F.box(VC.solid, wood, x, top - 0.12, ez / 2, 0.08, 0.1, ez);
+    const nW = Math.max(2, Math.floor((w - 2.2) / 2.6)), door = randi(0, nW - 1), shut = chance(0.5) ? pick(['#2a5a4a', '#2a4a6a', '#5a3a2a', '#3a5a3a']) : null;
     for (let f = 0; f < floors; f++) for (let k = 0; k < nW; k++) {
       const x = -hw + 1.6 + (k * (w - 3.2)) / Math.max(1, nW - 1), y = f * FH + 1.9;
-      if (f === 0 && k === door) {   // the arched door under its lamp
-        F.box(VC.solid, '#3a2418', x, 1.15, 0.04, 1.3, 2.3, 0.06); F.add(G.cyl, VC.solid, x, 2.3, 0.04, 1.3, 0.06, 1.3, Math.PI / 2, 0, 0, '#3a2418');
-        F.box(VC.glow, hdr(pick(WARM), 1.6), x + 0.95, 2.2, 0.1, 0.16, 0.26, 0.12);
+      if (f === 0 && k === door) {   // the arched door in its surround, the tile hood on brackets, the lantern, the step
+        F.box(VC.solid, shade(col, 0.92), x, 1.25, 0.05, 1.7, 2.5, 0.08); F.add(G.cyl, VC.solid, x, 2.5, 0.05, 1.7, 0.08, 1.7, Math.PI / 2, 0, 0, shade(col, 0.92));
+        F.box(VC.solid, '#3a2418', x, 1.15, 0.09, 1.3, 2.3, 0.06); F.add(G.cyl, VC.solid, x, 2.3, 0.09, 1.3, 0.06, 1.3, Math.PI / 2, 0, 0, '#3a2418');
+        for (let j = -1; j <= 1; j += 2) F.box(VC.solid, '#2a1810', x + j * 0.32, 1.2, 0.13, 0.04, 1.9, 0.02);   // its planks
+        F.add(G.box, K.tileMat, x, 3.25, 0.5, 2.2, 0.08, 1.0, -0.4, 0, 0, '#ffffff'); for (const e of [-1, 1]) F.beam(VC.solid, wood, [x + e * 0.9, 2.75, 0.05], [x + e * 0.9, 3.05, 0.8], 0.1);
+        F.box(VC.glow, hdr(pick(WARM), 1.6), x + 1.05, 2.2, 0.14, 0.16, 0.26, 0.12); F.box(VC.metal, '#1a1a1e', x + 1.05, 2.4, 0.14, 0.2, 0.05, 0.16);
         F.box(VC.solid, '#b8a890', x, 0.08, 0.6, 1.8, 0.16, 1.2);
         continue;
       }
-      if (f === 0) archWin(F, x, y - 0.1, 0.03, 1.1, 1.6, glass(lit, sunny), fc);
-      else {
-        F.box(VC.solid, fc, x, y, 0.03, 1.2, 1.5, 0.06); F.box(VC.glow, glass(lit, sunny), x, y, 0.065, 1.0, 1.3, 0.04);
-        if (chance(0.5)) { F.box(VC.metal, '#1a1a1e', x, y - 0.75, 0.32, 1.5, 0.06, 0.6); F.box(VC.metal, '#1a1a1e', x, y - 0.12, 0.6, 1.5, 0.04, 0.04); for (let j = 0; j <= 5; j++) F.box(VC.metal, '#1a1a1e', x - 0.72 + j * 0.29, y - 0.44, 0.6, 0.03, 0.62, 0.03); }
+      if (f === 0) {
+        archWin(F, x, y - 0.1, 0.03, 1.1, 1.6, glass(lit, sunny), fc);
+        for (const e of [-0.3, 0, 0.3]) F.box(VC.metal, '#1a1a1e', x + e, y - 0.15, 0.11, 0.03, 1.5, 0.03);   // its grille
+        F.box(VC.metal, '#1a1a1e', x, y + 0.2, 0.11, 1.0, 0.03, 0.03);
+        F.box(VC.solid, shade(col, 0.88), x, y - 0.98, 0.1, 1.4, 0.07, 0.18);
+      } else {
+        F.box(VC.solid, fc, x, y, 0.03, 1.2, 1.5, 0.06); F.box(VC.glow, glass(lit, sunny), x, y, 0.065, 1.0, 1.3, 0.04); F.box(VC.solid, fc, x, y, 0.09, 0.04, 1.3, 0.03);
+        if (chance(0.5)) { F.box(VC.metal, '#1a1a1e', x, y - 0.75, 0.32, 1.5, 0.06, 0.6); F.box(VC.metal, '#1a1a1e', x, y - 0.12, 0.6, 1.5, 0.04, 0.04); for (let j = 0; j <= 5; j++) F.box(VC.metal, '#1a1a1e', x - 0.72 + j * 0.29, y - 0.44, 0.6, 0.03, 0.62, 0.03); for (const e of [-0.6, 0.6]) F.beam(VC.metal, '#1a1a1e', [x + e, y - 1.2, 0.05], [x + e, y - 0.78, 0.55], 0.04); }
+        else if (shut) for (const e of [-1, 1]) F.box(VC.solid, shut, x + e * 0.86, y, 0.07, 0.5, 1.45, 0.05);
       }
     }
     if (tower) {   // a square tower at one end, a floor higher, under its own pyramid of tile
       const tx = pick([-1, 1]) * (hw - 1.6), th = top + FH * 0.9;
       F.addM(K.tiledBox(3.2, th + 1, 3.2, 2.5), K.stuccoMat, new THREE.Matrix4().makeTranslation(tx, (th - 1) / 2, -1.7), col);
       F.addM(hipRoof(3.8, 3.8, 1.8), K.tileMat, new THREE.Matrix4().makeTranslation(tx, th, 0.2), '#ffffff');
+      F.box(VC.solid, wood, tx, th - 0.07, 0.17, 3.7, 0.14, 0.06);
       archWin(F, tx, th - 1.2, 0.03, 0.7, 0.9, glass(lit, sunny), fc);
-    } else if (chance(0.6)) F.box(VC.solid, col, pick([-1, 1]) * (hw - 1.2), top + rh * 0.7, -d * 0.6, 0.9, 2.4, 0.9);   // the chimney
+    } else if (chance(0.6)) { const cx = pick([-1, 1]) * (hw - 1.2); F.box(VC.solid, col, cx, top + rh * 0.7, -d * 0.6, 0.9, 2.4, 0.9); F.box(VC.solid, shade(col, 0.85), cx, top + rh * 0.7 + 1.25, -d * 0.6, 1.1, 0.12, 1.1); F.addM(gableRoof(0.9, 0.9, 0.35), K.tileMat, new THREE.Matrix4().makeTranslation(cx, top + rh * 0.7 + 1.35, -d * 0.6 + 0.45), '#ffffff'); }   // the chimney and its little tile cap
+    F.box(VC.solid, shade(col, 0.8), pick([-1, 1]) * (hw - 0.08), top / 2, 0.06, 0.09, top, 0.09);   // the downspout
     if (bougain) { const p = F.at(pick([-1, 1]) * (hw - 1.3), top - 0.2, 0.12); K.bougain(b, p.x, p.y, p.z, 2.6, rand(2.4, 3.6), face(s)); }
     if (chance(0.6)) (chance(0.5) ? K.strelitzia : K.agave)(b, ...xz(F, rand(-hw + 1, hw - 1), 0.9), rand(0.9, 1.2), { y });
+    if (chance(0.4)) for (const e of [-1, 1]) { const p = F.at(e * (hw - 0.6), 0, 0.7); b.cyl(VC.solid, '#a8502a', p.x, y + 0.3, p.z, 0.32, 0.6, 'cyl8'); K.shrub(b, p.x, p.z, { y: y + 0.45, s: 0.6 }); }   // terracotta pots
     return { top: top + rh };
   };
-  // a Craftsman bungalow: clapboard, a low gable with wide eaves, the porch under its own gable on tapered posts
+  // a Craftsman bungalow: clapboard on a plinth, a low gable with wide eaves on knee braces and rafter tails, the porch
+  // under its own gable on tapered posts over stone piers, its rail and steps; the windows in threes, their muntins
   K.bungalow = (b, s, xf, zc, { w = rand(9, 11), d = rand(10, 12), col = pick(CRAFT), trim = pick(['#f4f0e4', '#e8dcc0', '#3a2a20', '#f2ece0']), lit = 0.5 } = {}) => {
     const F = frame(b, s * xf, 0, zc, 1, face(s)), sunny = s > 0, H = 3.6, hw = w / 2, roof = pick(['#4a4440', '#5a4a3e', '#3a3a3c', '#6a5a4a']);
     F.addM(K.tiledBox(w, H + 0.6, d, 2), K.sidingMat, new THREE.Matrix4().makeTranslation(0, (H - 0.6) / 2, -d / 2), col);
     F.box(VC.solid, '#8a7a6a', 0, 0.3, -d / 2, w + 0.12, 0.62, d + 0.12);   // its plinth
     F.addM(prism(w + 1.6, 2.0, d + 1.2), VC.solid, new THREE.Matrix4().makeTranslation(0, H, 0.6), roof);
     F.addM(gableFace(w - 0.1, 1.9), K.sidingMat, new THREE.Matrix4().makeTranslation(0, H, 0.02), col);
+    for (const e of [-1, 1]) { F.beam(VC.solid, trim, [e * (hw - 0.3), H - 0.5, 0.05], [e * (hw + 0.5), H - 0.02, 0.55], 0.1); for (let z = -0.5; z > -d; z -= 0.7) F.box(VC.solid, trim, e * (hw + 0.45), H - 0.08, z, 0.75, 0.08, 0.08); }   // the knee braces, the rafter tails
+    F.box(VC.glow, glass(lit * 0.6, sunny), 0, H + 0.8, 0.06, 1.0, 0.5, 0.04); for (let k = -2; k <= 2; k++) F.box(VC.solid, trim, k * 0.22, H + 0.8, 0.09, 0.03, 0.5, 0.02);   // the attic vent
     const px = pick([-1, 1]) * (hw / 2 - 0.2), pw = hw + 0.6;
     F.addM(prism(pw + 0.8, 1.3, 2.9), VC.solid, new THREE.Matrix4().makeTranslation(px, H - 0.3, 2.9), roof);
     F.box(VC.solid, trim, px, H - 0.45, 2.55, pw + 0.4, 0.3, 0.22);
-    for (const e of [-1, 1]) { F.block(VC.solid, '#7a6a5a', px + (e * pw) / 2, 0, 2.4, 0.62, 1.1, 0.62); F.limb(VC.solid, trim, [px + (e * pw) / 2, 1.1, 2.4], [px + (e * pw) / 2, H - 0.6, 2.4], 0.24, 0.15, 6); }
-    F.box(VC.solid, '#a89888', px, 0.55, 1.3, pw + 0.4, 0.1, 2.4);   // the porch floor
-    F.box(VC.solid, '#3a2a20', px + 0.8, 1.15, 0.04, 1.0, 2.3, 0.06);
+    for (const e of [-1, 1]) { F.block(VC.solid, '#7a6a5a', px + (e * pw) / 2, 0, 2.4, 0.62, 1.1, 0.62); F.box(VC.solid, '#6a5a4a', px + (e * pw) / 2, 1.13, 2.4, 0.7, 0.06, 0.7); F.limb(VC.solid, trim, [px + (e * pw) / 2, 1.1, 2.4], [px + (e * pw) / 2, H - 0.6, 2.4], 0.24, 0.15, 6); }
+    F.box(VC.solid, '#a89888', px, 0.55, 1.3, pw + 0.4, 0.1, 2.4);   // the porch floor, its rail and balusters, the steps
+    const sx = px + pw / 2 - 1.0;
+    F.box(VC.solid, trim, (px - pw / 2 + 0.3 + sx - 0.6) / 2, 1.5, 2.4, sx - 0.6 - (px - pw / 2 + 0.3), 0.08, 0.1);
+    for (let x = px - pw / 2 + 0.5; x < sx - 0.6; x += 0.3) F.box(VC.solid, trim, x, 1.05, 2.4, 0.05, 0.9, 0.05);
+    for (let k = 0; k < 3; k++) F.box(VC.solid, '#a89888', sx, 0.12 + k * 0.15, 2.75 + (2 - k) * 0.28, 1.3, 0.12, 0.3);
+    F.box(VC.solid, '#3a2a20', px + 0.8, 1.15, 0.04, 1.0, 2.3, 0.06); F.box(VC.glow, hdr(pick(WARM), 1.2), px + 0.8, 1.6, 0.08, 0.5, 0.7, 0.02);
     F.box(VC.glow, hdr(pick(WARM), 1.5), px - 0.3, 2.5, 0.1, 0.18, 0.22, 0.1);
+    if (chance(0.5)) { F.box(VC.solid, pick(['#3a5a3a', '#f4f0e4', '#8a3a2a']), px - 0.9, 0.76, 1.6, 0.6, 0.34, 0.6); F.box(VC.solid, '#3a2a20', px - 0.9, 1.25, 1.3, 0.6, 0.65, 0.06); }   // a chair on the porch
     const wx = -px * 0.95;
-    for (let k = -1; k <= 1; k++) { F.box(VC.solid, trim, wx + k * 0.95, 1.85, 0.03, 0.95, 1.5, 0.06); F.box(VC.glow, glass(lit, sunny), wx + k * 0.95, 1.85, 0.065, 0.78, 1.3, 0.04); }
-    F.box(VC.glow, glass(lit * 0.6, sunny), 0, H + 0.8, 0.06, 1.0, 0.5, 0.04);   // the attic vent's window
+    for (let k = -1; k <= 1; k++) {
+      F.box(VC.solid, trim, wx + k * 0.95, 1.85, 0.03, 0.95, 1.5, 0.06); F.box(VC.glow, glass(lit, sunny), wx + k * 0.95, 1.85, 0.065, 0.78, 1.3, 0.04);
+      F.box(VC.solid, trim, wx + k * 0.95, 2.18, 0.09, 0.78, 0.04, 0.02); for (const e of [-0.2, 0.2]) F.box(VC.solid, trim, wx + k * 0.95 + e, 2.35, 0.09, 0.03, 0.34, 0.02);   // the upper sash's muntins
+    }
+    F.box(VC.solid, trim, wx, 1.05, 0.12, 3.0, 0.08, 0.18);
+    if (chance(0.6)) { const cx = -px * 1.6; F.box(VC.solid, pick(['#7a6a5a', '#8a5a4a', '#6a6460']), Math.max(-hw + 0.5, Math.min(hw - 0.5, cx)), H + 0.7, -d / 2, 0.9, H + 2.0, 0.9); }   // the chimney of river rock
     return { top: H + 2 };
   };
-  // a dingbat: a stucco box of flats standing over its open carport, the name in script across the front, a starburst or two
+  // a dingbat: a stucco box of flats standing over its open carport, the name in script across the front, a starburst or
+  // two, the open stair up the side with its rail, the walkway along the back, wall units and mailboxes
   const DINGBATS = ['The Capri', 'Sea Breeze', 'The Starlite', 'Palm Royale', 'The Tahitian', 'Lanai', 'Kona Gardens', 'The Biscayne', 'Sunset Arms', 'The Mariner'];
   K.dingbat = (b, s, xf, zc, { w = rand(13, 16), d = 13, col = pick(PASTEL), lit = 0.5, storeys = randi(1, 2) } = {}) => {
     const F = frame(b, s * xf, 0, zc, 1, face(s)), sunny = s > 0, G0 = 2.7, FH = 2.9, top = G0 + storeys * FH, hw = w / 2;
     F.addM(K.tiledBox(w, storeys * FH, d, 2.5), K.stuccoMat, new THREE.Matrix4().makeTranslation(0, G0 + (storeys * FH) / 2, -d / 2), col);
-    F.box(VC.solid, '#2a2624', 0, G0 / 2, -d + 0.6, w - 0.2, G0, 1.0);   // the back of the carport
+    F.box(VC.solid, '#2a2624', 0, G0 / 2, -d + 0.6, w - 0.2, G0, 1.0);   // the back of the carport, its ceiling and lamps
     F.box(VC.solid, shade(col, 0.8), 0, G0 + 0.12, -d / 2, w, 0.25, d);
+    for (let k = 0; k < 3; k++) F.box(VC.glow, hdr('#fff0d0', 1.3), -hw + 2.2 + k * ((w - 4.4) / 2), G0 - 0.02, -d / 2, 0.5, 0.04, 0.5);
     for (let x = -hw + 0.3; x <= hw - 0.2; x += (w - 0.6) / 4) F.cyl(VC.metal, '#3a3a3e', x, G0 / 2, -0.3, 0.07, G0, 'cyl6');
     for (let k = 0; k < 3; k++) if (chance(0.75)) K.place(b, (t) => K.car(t, 0, 0, 1, {}), new THREE.Matrix4().multiplyMatrices(F.M, new THREE.Matrix4().makeTranslation(-hw + 2.2 + k * ((w - 4.4) / 2), 0, -d / 2 + 1)));
-    for (let f = 0; f < storeys; f++) for (let k = 0; k < 3; k++) { const x = -hw + 2 + k * ((w - 4) / 2), y = G0 + f * FH + 1.5; F.box(VC.solid, '#e8e8ea', x, y, 0.03, 2.2, 1.3, 0.05); F.box(VC.glow, glass(lit, sunny), x, y, 0.06, 2.0, 1.1, 0.04); F.box(VC.solid, '#e8e8ea', x, y, 0.07, 0.05, 1.1, 0.03); }
+    for (let f = 0; f < storeys; f++) for (let k = 0; k < 3; k++) {
+      const x = -hw + 2 + k * ((w - 4) / 2), y = G0 + f * FH + 1.5;
+      F.box(VC.solid, '#e8e8ea', x, y, 0.03, 2.2, 1.3, 0.05); F.box(VC.glow, glass(lit, sunny), x, y, 0.06, 2.0, 1.1, 0.04); F.box(VC.solid, '#e8e8ea', x, y, 0.07, 0.05, 1.1, 0.03);
+      F.box(VC.solid, shade(col, 0.85), x, y - 0.7, 0.1, 2.3, 0.06, 0.16);
+      if (chance(0.3)) { F.box(VC.solid, '#d8dcd8', x + 0.6, y - 1.0, 0.2, 0.6, 0.38, 0.4); F.box(VC.solid, '#5a5e64', x + 0.6, y - 1.0, 0.41, 0.46, 0.26, 0.02); }
+    }
+    F.box(VC.solid, shade(col, 0.75), 0, top + 0.06, 0.02, w + 0.1, 0.12, 0.12);   // the roof's fascia
     const name = pick(DINGBATS);
     K.sign(F, name, { w: 512, h: 160, color: pick(['#ffffff', '#ffd23d', '#1a1a24', '#ff5aa0', '#2a6ad8']), font: SCRIPT, size: 0.62, k: 1.0 }, pick([-1, 1]) * hw * 0.35, top - 0.75, 0.08, 4.6, 1.4, 1, 0, 0, 0);
     for (let k = randi(1, 2); k > 0; k--) {   // the starbursts
@@ -758,38 +959,72 @@ export function makeKit() {
       for (let j = 0; j < 8; j++) { const a = (j / 8) * Math.PI * 2; F.add(G.box, VC.metal, sx + Math.cos(a) * 0.3, sy + Math.sin(a) * 0.3, 0.1, 0.6, 0.04, 0.04, 0, 0, a, '#d8b048'); }
       F.ell(VC.metal, '#d8b048', sx, sy, 0.1, 0.09, 0.09, 0.05, true);
     }
-    F.beam(VC.metal, '#3a3a3e', [hw + 0.6, 0.1, -2], [hw + 0.6, G0 + 0.2, -d + 3], 0.12, 1.0);   // the open stair up the side
+    F.beam(VC.metal, '#3a3a3e', [hw + 0.6, 0.1, -2], [hw + 0.6, G0 + 0.2, -d + 3], 1.0, 0.12);   // the open stair up the side, its rail
+    F.beam(VC.metal, '#1a1a1e', [hw + 1.1, 1.0, -2], [hw + 1.1, G0 + 1.1, -d + 3], 0.04, 0.04);
+    for (let t = 0; t <= 1.001; t += 0.2) F.box(VC.metal, '#1a1a1e', hw + 1.1, 0.55 + t * (G0 + 0.1), -2 - t * (d - 5), 0.03, 0.9, 0.03);
+    for (let k = 0; k < 4; k++) F.box(VC.metal, '#8a8e94', hw + 0.11, 1.2 + (k % 2) * 0.32, -0.8 - Math.floor(k / 2) * 0.42, 0.22, 0.28, 0.38);   // the mailboxes, on the wall
     return { top };
   };
 
   // ---------- shops ----------
-  // one shop, 1–4 floors: 'stucco' (a flat parapet), 'deco' (pilasters, a stepped top, zigzags, maybe a blade sign),
-  // 'mission' (a scalloped parapet and a tile awning); the goods in its window, its board, an awning
+  // one shop, 1–4 floors: 'stucco' (a flat parapet), 'deco' (fluted pilasters, a stepped top, zigzags, maybe a blade
+  // sign), 'mission' (a scalloped parapet under tile, a tile pent over the window); at the street the kickplate, the
+  // window full of its goods behind its mullions and transom, the glazed door in its frame, the board in its frame with
+  // gooseneck lamps over it, an awning with its valance; upstairs the windows with their sills and heads, an air
+  // conditioner or a flower box under some; a string course, the downspout, units on the roof
   K.shop = (b, s, xf, zc, w, { style = 'stucco', floors = 1, col = pick(STUCCO), sign = pick(STRIP_SIGNS), lit = 0.5, blade = false, d = rand(12, 16) } = {}) => {
     const F = frame(b, s * xf, 0, zc, 1, face(s)), sunny = s > 0, G0 = 4.2, FH = 3.3, top = G0 + (floors - 1) * FH, hw = w / 2, L = w - 1.4, acc = shade(col, 0.62);
+    const trim = style === 'deco' ? shade(col, 1.08) : pick(['#f4f0e8', '#2a2a2e', acc, '#5a3a2a']), wx = -0.55, ww = L - 1.3;
     F.addM(K.tiledBox(w, top + 1, d, 2.5), K.stuccoMat, new THREE.Matrix4().makeTranslation(0, (top - 1) / 2, -d / 2), col);
-    K.board(F, K.goodsRects[GI[sign.goods]], -0.55, 1.6, 0.07, L - 1.3, 2.4, 1, 0, 0, 0);
-    F.box(VC.solid, acc, -0.55, 1.6, 0.04, L - 1.1, 2.6, 0.06);
-    F.box(VC.solid, '#2a2420', hw - 0.85, 1.25, 0.05, 0.95, 2.5, 0.06);
-    F.box(VC.glow, hdr(pick(WARM), 0.8), hw - 0.85, 2.7, 0.07, 0.85, 0.35, 0.04);
-    const sw = Math.min(w - 0.8, 5.4);
-    K.board(F, K.signRects[sign.i], 0, 3.5, 0.08, sw, (sw * 104) / 512, 1, 0, 0, 0);
-    if (style === 'mission') { F.add(G.box, K.tileMat, 0, 3.0, 0.75, w - 0.4, 0.08, 1.5, -0.35, 0, 0, '#ffffff'); for (const e of [-1, 1]) F.box(VC.solid, shade(col, 0.8), e * (hw - 0.3), 2.6, 1.3, 0.12, 0.8, 0.12); }
-    else if (chance(0.55)) F.add(G.box, VC.solid, -0.55, 2.95, 0.65, L - 0.9, 0.05, 1.3, -0.28, 0, 0, pick(['#c8302a', '#2a6a4a', '#2a3a6a', '#e8c030', '#ff7a2a', '#39b8b0', '#1a1a1e']));
-    for (let f = 1; f < floors; f++) for (let k = 0; k < Math.max(1, Math.floor(w / 2.4)); k++) {
-      const n = Math.max(1, Math.floor(w / 2.4)), x = -hw + w / (2 * n) + (k * w) / n, y = G0 + (f - 1) * FH + 1.7;
-      F.box(VC.solid, acc, x, y, 0.03, 1.2, 1.6, 0.05); F.box(VC.glow, glass(lit, sunny), x, y, 0.06, 1.0, 1.4, 0.04);
+    F.box(VC.solid, pick(['#3a3a3e', '#7a2a2a', '#2a4a3a', '#c8c0b4', acc]), wx, 0.26, 0.06, ww + 0.2, 0.52, 0.12);   // the kickplate
+    K.board(F, K.goodsRects[GI[sign.goods]], wx, 1.66, 0.07, ww, 2.1, 1, 0, 0, 0);
+    F.box(VC.solid, trim, wx, 1.66, 0.04, ww + 0.22, 2.36, 0.06);
+    const nm = Math.max(1, Math.round(ww / 1.7));
+    for (let k = 1; k < nm; k++) F.box(VC.solid, trim, wx - ww / 2 + (k * ww) / nm, 1.66, 0.1, 0.06, 2.1, 0.05);   // the mullions, the transom bar and its glass
+    F.box(VC.solid, trim, wx, 2.78, 0.1, ww + 0.2, 0.08, 0.06); F.box(VC.glow, hdr(pick(WARM), 0.75), wx, 3.0, 0.075, ww, 0.34, 0.03);
+    const dx = hw - 0.85;   // the door: its frame, the glass, the push bar, the step, the number over it
+    F.box(VC.solid, trim, dx, 1.3, 0.05, 1.12, 2.6, 0.08); F.box(VC.glow, hdr(pick(WARM), 0.9), dx, 1.2, 0.1, 0.82, 2.2, 0.03);
+    F.box(VC.metal, '#c8ccd2', dx, 1.15, 0.13, 0.62, 0.05, 0.04); F.box(VC.solid, '#a8a094', dx, 0.04, 0.35, 1.3, 0.08, 0.6);
+    F.box(VC.glow, hdr(pick(WARM), 1.5), dx + 0.75, 2.55, 0.12, 0.14, 0.24, 0.12);   // its lamp
+    const sw = Math.min(w - 0.8, 5.4), sh = (sw * 104) / 512;
+    F.box(VC.solid, pick(['#1a1a1e', trim, acc]), 0, 3.5, 0.05, sw + 0.18, sh + 0.16, 0.08);   // the board's frame, the board, its lamps
+    K.board(F, K.signRects[sign.i], 0, 3.5, 0.1, sw, sh, 1, 0, 0, 0);
+    if (chance(0.5)) for (const e of [-0.33, 0.33]) { F.beam(VC.metal, '#2a2a2e', [e * sw, 4.0, 0.06], [e * sw, 4.35, 0.5], 0.04); F.add(G.cone8, VC.metal, e * sw, 4.3, 0.55, 0.3, 0.18, 0.3, Math.PI, 0, 0, '#2a2a2e'); F.box(VC.glow, hdr('#fff0d0', 1.8), e * sw, 4.22, 0.55, 0.18, 0.02, 0.18); }
+    if (style === 'mission') { F.add(G.box, K.tileMat, 0, 3.0, 0.75, w - 0.4, 0.08, 1.5, -0.35, 0, 0, '#ffffff'); for (const e of [-1, 1]) { F.box(VC.solid, shade(col, 0.8), e * (hw - 0.3), 2.6, 1.3, 0.12, 0.8, 0.12); F.beam(VC.solid, '#4a3020', [e * (hw - 0.3), 2.2, 0.05], [e * (hw - 0.3), 2.65, 1.3], 0.1); } }
+    else if (chance(0.6)) {   // an awning: its slope, its valance, stripes on some
+      const ac = pick(['#c8302a', '#2a6a4a', '#2a3a6a', '#e8c030', '#ff7a2a', '#39b8b0', '#1a1a1e']), striped = chance(0.4);
+      if (striped) { const n = Math.max(3, Math.round((L - 0.9) / 0.5)); for (let k = 0; k < n; k++) F.add(G.box, VC.solid, wx - (L - 0.9) / 2 + ((k + 0.5) * (L - 0.9)) / n, 2.95, 0.65, (L - 0.9) / n, 0.05, 1.3, -0.28, 0, 0, k % 2 ? '#f4f0e8' : ac); }
+      else F.add(G.box, VC.solid, wx, 2.95, 0.65, L - 0.9, 0.05, 1.3, -0.28, 0, 0, ac);
+      F.box(VC.solid, ac, wx, 2.62, 1.27, L - 0.9, 0.3, 0.03);
+      for (const e of [-1, 1]) F.beam(VC.metal, '#3a3a3e', [wx + e * (L - 1) / 2, 3.12, 0.04], [wx + e * (L - 1) / 2, 2.78, 1.25], 0.03);
     }
-    if (style === 'deco') {   // pilasters up the front, a zigzag band, the stepped top
-      for (const x of [-hw + 0.25, hw - 0.25, ...(w > 9 ? [0] : [])]) F.box(VC.solid, shade(col, 1.06), x, (G0 + top + 1.6) / 2, 0.12, 0.5, top + 1.6 - G0, 0.24);
+    if (floors > 1) F.box(VC.solid, shade(col, 0.9), 0, G0 - 0.05, 0.08, w + 0.04, 0.18, 0.16);   // the string course over the shop
+    const n = Math.max(1, Math.floor(w / 2.4));
+    for (let f = 1; f < floors; f++) for (let k = 0; k < n; k++) {
+      const x = -hw + w / (2 * n) + (k * w) / n, y = G0 + (f - 1) * FH + 1.7;
+      F.box(VC.solid, acc, x, y, 0.03, 1.2, 1.6, 0.05); F.box(VC.glow, glass(lit, sunny), x, y, 0.06, 1.0, 1.4, 0.04);
+      F.box(VC.solid, acc, x, y, 0.08, 0.05, 1.4, 0.03);   // its sash bar, sill and head
+      F.box(VC.solid, shade(col, 0.88), x, y - 0.86, 0.1, 1.4, 0.08, 0.2); F.box(VC.solid, shade(col, 0.92), x, y + 0.88, 0.07, 1.36, 0.12, 0.12);
+      const r = Math.random();
+      if (r < 0.14) { F.box(VC.solid, '#d8dcd8', x + 0.1, y - 1.12, 0.22, 0.62, 0.4, 0.42); F.box(VC.solid, '#5a5e64', x + 0.1, y - 1.12, 0.44, 0.48, 0.28, 0.02); }   // a window unit
+      else if (r < 0.26) { F.box(VC.solid, '#6a4a2a', x, y - 0.98, 0.2, 1.1, 0.2, 0.26); for (let j = 0; j < 4; j++) F.add(G.sphLow, VC.solid, x - 0.4 + j * 0.27, y - 0.8, 0.2, 0.26, 0.2, 0.22, 0, 0, 0, pick(['#e8305a', '#ff7aa0', '#f4f0f0', '#ffd23d', '#3a6a2a'])); }   // a flower box
+    }
+    if (style === 'deco') {   // fluted pilasters up the front, a zigzag band, the stepped top, neon along its edge on some
+      for (const x of [-hw + 0.25, hw - 0.25, ...(w > 9 ? [0] : [])]) { F.box(VC.solid, shade(col, 1.06), x, (G0 + top + 1.6) / 2, 0.12, 0.5, top + 1.6 - G0, 0.24); for (const e of [-0.12, 0.12]) F.box(VC.solid, shade(col, 0.9), x + e, (G0 + top + 1.6) / 2, 0.25, 0.05, top + 1.4 - G0, 0.02); }
       for (let x = -hw + 0.5; x < hw - 0.4; x += 0.7) F.add(G.box, VC.solid, x + 0.17, top + 0.3, 0.1, 0.45, 0.06, 0.06, 0, 0, 0.8, acc), F.add(G.box, VC.solid, x + 0.52, top + 0.3, 0.1, 0.45, 0.06, 0.06, 0, 0, -0.8, acc);
       F.box(VC.solid, col, 0, top + 1.05, -0.5, w, 1.3, 1.0); F.box(VC.solid, col, 0, top + 2.0, -0.6, w * 0.45, 0.8, 0.9); F.box(VC.solid, shade(col, 1.06), 0, top + 2.55, -0.6, w * 0.22, 0.4, 0.8);
+      F.box(VC.solid, shade(col, 0.85), 0, top + 1.72, 0.0, w + 0.06, 0.08, 0.06);
+      if (chance(0.35)) F.box(VC.glow, hdr(pick(['#ff5aa0', '#39e8ff', '#ffd23d']), 1.8), 0, top + 1.78, 0.05, w - 0.2, 0.05, 0.03);
       if (blade) { const p = F.at(0, 0, 0); K.bladeSign(b, s * xf, G0 + 0.6, p.z, s, pick(BLADES)); }
-    } else if (style === 'mission') {   // a scalloped parapet over the middle
+    } else if (style === 'mission') {   // a scalloped parapet over the middle, its tile cap, a round vent in it
       F.box(VC.solid, col, 0, top + 0.6, 0, w, 1.2, 0.3);
       F.add(G.cyl, K.stuccoMat, 0, top + 1.2, 0, w * 0.4, 0.3, w * 0.4, Math.PI / 2, 0, 0, col);
       F.box(VC.solid, acc, 0, top + 1.15 + w * 0.2, 0, 0.4, 0.4, 0.32);
-    } else F.box(VC.solid, shade(col, 0.95), 0, top + 0.45, 0, w, 0.9, 0.3);
+      F.add(G.box, K.tileMat, 0, top + 1.25, -0.05, w + 0.1, 0.1, 0.5, 0, 0, 0, '#ffffff');
+      F.cyl(VC.solid, '#3a2a24', 0, top + 1.15, 0.16, 0.28, 0.04, 'cyl8', Math.PI / 2);
+    } else { F.box(VC.solid, shade(col, 0.95), 0, top + 0.45, 0, w, 0.9, 0.3); F.box(VC.solid, shade(col, 0.85), 0, top + 0.93, 0, w + 0.1, 0.08, 0.4); }
+    F.box(VC.solid, shade(col, 0.78), pick([-1, 1]) * (hw - 0.12), (top + 0.9) / 2, 0.07, 0.1, top + 0.9, 0.1);   // the downspout
+    if (chance(0.5)) { const rx = rand(-hw + 1.4, hw - 1.4), rz = -rand(3, d - 3); F.box(VC.solid, '#c8ccd0', rx, top + 0.5, rz, 1.4, 1.0, 1.1); F.cyl(VC.metal, '#5a5e64', rx, top + 1.02, rz, 0.4, 0.04, 'cyl8'); }   // a unit on the roof
     K.pool(b, s * (xf - 1.6), zc, 3, w - 1, hdr('#ffd9a0', 0.09));
     return { top };
   };
@@ -849,27 +1084,50 @@ export function makeKit() {
   K.stoneMat = facadeMat(stoneT, { k: 0.8 }); K.glassMat = facadeMat(glassT, { k: 0.7, rough: 0.3, metal: 0.5 });
   K.stoneT = stoneT; K.glassT = glassT;
   const towerFront = (b, i, signs) => {   // the ground floor of an office building: granite, the shops' windows and boards, a canopy at the door
-    const s = i.side, L = Math.min(i.len - 2, 9), sign = pick(signs);
-    b.box(VC.solid, '#5a5048', i.face - s * 0.2, 2.6, i.z, 0.4, 5.2, i.len);
+    const s = i.side, L = Math.min(i.len - 2, 9), sign = pick(signs), fx = i.face - s * 0.2;
+    b.box(VC.solid, '#5a5048', fx, 2.6, i.z, 0.4, 5.2, i.len);
+    b.box(VC.solid, '#6a6058', i.face - s * 0.45, 5.35, i.z, 0.5, 0.3, i.len + 0.1);   // the cornice over the base
+    for (let z = i.z - i.len / 2 + 0.3; z <= i.z + i.len / 2 - 0.2; z += Math.max(2.5, (i.len - 0.6) / Math.round((i.len - 0.6) / 3.2))) b.box(VC.solid, '#4a423c', i.face - s * 0.43, 2.6, z, 0.1, 5.2, 0.5);   // its piers
     K.board(b, K.goodsRects[GI[sign.goods]], i.face - s * 0.43, 2.0, i.z + i.len / 4, L / 2, 2.6, 1, 0, face(s), 0);
     K.board(b, K.signRects[sign.i], i.face - s * 0.44, 3.75, i.z + i.len / 4, Math.min(L / 2, 4.5), (Math.min(L / 2, 4.5) * 104) / 512, 1, 0, face(s), 0);
     b.box(VC.glow, hdr('#ffe8c8', 0.42), i.face - s * 0.43, 2.2, i.z - i.len / 4, 0.04, 3.4, L / 2);
     for (let k = 0; k <= 4; k++) b.box(VC.solid, '#2a2a30', i.face - s * 0.46, 2.2, i.z - i.len / 4 - L / 4 + (k * L) / 8, 0.05, 3.4, 0.12);
+    b.box(VC.solid, '#2a2a30', i.face - s * 0.46, 3.9, i.z - i.len / 4, 0.06, 0.1, L / 2);
     b.box(VC.metal, '#3a3a40', i.face - s * 1.4, 4.6, i.z - i.len / 4, 2.4, 0.18, Math.min(5, L / 2));
+    for (const e of [-1, 1]) beam(b, VC.metal, i.face - s * 0.45, 5.2, i.z - i.len / 4 + e * Math.min(2.3, L / 4), i.face - s * 2.5, 4.7, i.z - i.len / 4 + e * Math.min(2.3, L / 4), 0.03, '#2a2a30');   // the canopy's tie rods
+    b.box(VC.glow, hdr('#fff0d0', 1.2), i.face - s * 1.4, 4.49, i.z - i.len / 4, 2.2, 0.03, Math.min(4.6, L / 2 - 0.4));
     K.pool(b, i.face - s * 1.5, i.z, 3, L, hdr('#ffe6c0', 0.1));
   };
-  const towerTop = (b, i) => {   // a cornice; a crown lit from below on some, or the old rooftop sign
+  const towerTop = (b, i) => {   // a cornice and its dentils; a crown lit from below on some, or the old rooftop sign; the tank, the units
     b.box(VC.solid, shade(i.col, 0.96), i.x, i.h + 0.4, i.z, i.d + 0.6, 0.8, i.len + 0.6);
+    if (i.crown) for (let z = i.z - i.len / 2; z <= i.z + i.len / 2; z += 0.7) b.box(VC.solid, shade(i.col, 0.86), i.face - i.side * 0.12, i.h - 0.12, z, 0.24, 0.22, 0.3);
     if (i.crown && chance(0.45)) {
       const cw = i.len * 0.5, cd = i.d * 0.5, ch = rand(6, 11), tq = chance(0.4);   // some in turquoise terracotta and gold, a clock on the tower
       b.block(VC.solid, tq ? '#3ab4a8' : i.col, i.x, i.h + 0.8, i.z, cd, ch, cw);
       b.box(VC.glow, hdr(tq ? '#9af0e0' : pick(['#ffe8c0', '#ffd890']), 1.2), i.x, i.h + 0.9 + ch * 0.55, i.z, cd + 0.1, ch * 0.6, cw + 0.1);
+      for (const e of [-1, 1]) b.box(VC.solid, tq ? '#2a8a80' : shade(i.col, 1.05), i.x - i.side * (cd / 2 + 0.1), i.h + 0.8 + ch / 2, i.z + e * (cw / 2 - 0.25), 0.3, ch, 0.5);
       if (tq) b.cyl(VC.glow, hdr('#fff4dc', 1.6), i.x - i.side * (cd / 2 + 0.06), i.h + 0.8 + ch - 2, i.z, 1.4, 0.1, 'cyl', 0, Math.PI / 2);
       b.add(G.cone4, VC.metal, i.x, i.h + 0.8 + ch + 1.2, i.z, cd * 1.1, 2.4, cw * 1.1, 0, 0, 0, '#c8a050');
     } else if (i.crown && chance(0.5)) {   // the old rooftop sign, its letters on a steel frame
       const t = pick(['HOTEL', 'BANK', 'JEWELRY', 'FURNITURE', 'BROADWAY']);
       K.sign(b, t, { w: 512, h: 128, color: '#ff3a3a', font: BLADE, size: 0.7, glow: '#ff3a3a', k: 2.0 }, i.x - i.side * (i.d / 2 - 1), i.h + 2.6, i.z, Math.min(i.len - 2, 10), 2.5, 1, 0, face(i.side), 0);
       for (const e of [-1, 1]) b.box(VC.metal, '#2a2a30', i.x - i.side * (i.d / 2 - 1.08), i.h + 1.6, i.z + e * 3, 0.1, 3, 0.1);
+      for (let k = -3; k <= 3; k++) beam(b, VC.metal, i.x - i.side * (i.d / 2 - 1.3), i.h + 0.8, i.z + k * 0.9, i.x - i.side * (i.d / 2 - 1.3), i.h + 2.4, i.z + (k + 1) * 0.9, 0.04, '#2a2a30');
+    } else if (i.crown && chance(0.6)) {   // a water tank on its legs
+      const tx = i.x + i.side * rand(1, 3), tz = i.z + rand(-i.len / 4, i.len / 4);
+      for (const e of [-1, 1]) for (const f of [-1, 1]) b.cyl(VC.metal, '#3a3a3e', tx + e * 1.2, i.h + 1.6, tz + f * 1.2, 0.08, 2.4, 'cyl6');
+      b.cyl(VC.solid, '#6a4a2e', tx, i.h + 4.3, tz, 1.8, 3.4, 'cyl8'); b.add(G.cone8, VC.solid, tx, i.h + 6.5, tz, 3.8, 1.0, 3.8, 0, 0, 0, '#4a3a2a');
+      for (const y of [3.4, 4.6, 5.6]) b.cyl(VC.metal, '#2a2a2e', tx, i.h + y, tz, 1.84, 0.06, 'cyl8');
+    }
+    if (!i.crown) b.box(VC.glow, hdr('#ff3a2a', 2.2), i.x, i.h + 1.3, i.z, 0.25, 0.25, 0.25);
+  };
+  // an old building's fire escape down its front: a landing at each floor, its rail, the stairs between
+  const fireEscape = (b, fx, s, zc, h0, h1) => {
+    for (let y = h0, k = 0; y < h1; y += 3.3, k++) {
+      b.box(VC.metal, '#2a2a2e', fx - s * 0.7, y, zc, 1.3, 0.06, 4.2);
+      b.box(VC.metal, '#2a2a2e', fx - s * 1.33, y + 0.9, zc, 0.04, 0.04, 4.2);
+      for (let z = -2; z <= 2; z += 0.5) b.box(VC.metal, '#2a2a2e', fx - s * 1.33, y + 0.45, zc + z, 0.03, 0.9, 0.03);
+      if (y + 3.3 < h1) beam(b, VC.metal, fx - s * 0.7, y + 0.05, zc + (k % 2 ? 1.6 : -1.6), fx - s * 0.7, y + 3.25, zc + (k % 2 ? -1.6 : 1.6), 0.7, '#2a2a2e', 0.06);
     }
   };
   K.towerRow = (b, s, z0, z1, { x0 = 12.4, signs = DOWNTOWN_SIGNS, gaps = [] } = {}) => {
@@ -881,7 +1139,12 @@ export function makeKit() {
       const glassy = r > 0.7, h = glassy ? rand(55, 110) : rand(30, 46), col = glassy ? pick(['#ffffff', '#e8f0ff', '#dce8f4']) : pick(['#f2e8d8', '#e8dcc8', '#f4ecdc', '#e0d4c0', '#f0d8c0', '#e8d0b8']);
       b.addM(buildingGeo(d, h, len, glassy ? glassT : stoneT, glassy ? 1.6 : 1.9, glassy ? 3.6 : 3.3), glassy ? K.glassMat : K.stoneMat, at(cx, 0, cz), col);
       const info = { x: cx, z: cz, d, len, h, side: s, face: s * x0, col, crown: !glassy };
+      // the front's verticals: stone piers between the bays (and a string course every few floors), or the curtain wall's fins
+      const step = glassy ? 3.2 : 3.8;
+      for (let zz = cz - len / 2 + step / 2; zz < cz + len / 2 - 0.5; zz += step) b.box(glassy ? VC.metal : VC.solid, glassy ? '#c8d0dc' : shade(col, 1.04), s * (x0 - (glassy ? 0.1 : 0.14)), (5.6 + h) / 2, zz, glassy ? 0.2 : 0.28, h - 5.6, glassy ? 0.12 : 0.55);
+      if (!glassy) for (let y = 5.6 + 3.3 * 3; y < h - 2; y += 3.3 * 4) b.box(VC.solid, shade(col, 0.92), s * (x0 - 0.12), y, cz, 0.24, 0.22, len + 0.05);
       towerFront(b, info, signs); towerTop(b, info);
+      if (!glassy && chance(0.35)) fireEscape(b, s * x0, s, cz + rand(-len / 4, len / 4), 6.6, h - 2);
       z += len + rand(0, 0.6);
     }
   };
@@ -1056,11 +1319,131 @@ export function makeKit() {
   K.smoke = (pts) => { const m = puffs(pts, { size: 0.9, grow: 2.4, rise: 1.4, drift: 0.8, life: 5, n: 3, color: '#e0d4cc', opacity: 0.22 }); K.smokes.push(m); return m; };
   K.flushSmoke = (g) => { if (K.smokeBuf.length) g.add(K.smoke(K.smokeBuf.splice(0))); return g; };
 
+  // ---------- fences ----------
+  // chain link: galvanised posts every three metres or so, the top rail, the mesh (a diamond texture cut out); barbed
+  // wire along the top of the oil fields' and the studios' fences
+  K.linkMat = std({ map: canvasTex(64, 64, (g, w, h) => {
+    g.clearRect(0, 0, w, h); g.strokeStyle = '#d8dce2'; g.lineWidth = 3.2;
+    for (const o of [0, w / 2, w]) { g.beginPath(); g.moveTo(o - w / 2, 0); g.lineTo(o + w / 2, h); g.moveTo(o + w / 2, 0); g.lineTo(o - w / 2, h); g.stroke(); }
+  }), alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.45, metalness: 0.5 });
+  K.chainLink = (b, x0, z0, x1, z1, { h = 2.1, barbed = false, col = '#9a9ea4' } = {}) => {   // from (x0, z0) to (x1, z1) in the chunk
+    const L = Math.hypot(x1 - x0, z1 - z0), n = Math.max(1, Math.round(L / 3));
+    b.add(K.tiledPlane(L, h, 0.6), K.linkMat, (x0 + x1) / 2, h / 2, (z0 + z1) / 2, L, h, 1, 0, Math.atan2(-(z1 - z0), x1 - x0), 0);
+    const ph = h + (barbed ? 0.5 : 0.12);   // (the barbed wire strung along the posts' tops)
+    for (let k = 0; k <= n; k++) b.cyl(VC.metal, col, x0 + ((x1 - x0) * k) / n, ph / 2, z0 + ((z1 - z0) * k) / n, 0.035, ph, 'cyl6');
+    beam(b, VC.metal, x0, h, z0, x1, h, z1, 0.04, col);
+    if (barbed) for (const dy of [0.16, 0.3, 0.44]) beam(b, VC.metal, x0, h + dy, z0, x1, h + dy, z1, 0.012, '#5a5a5e');
+  };
+
+  // ---------- oil ----------
+  // A pumpjack nodding over its well, as they do in vacant lots all over the basin and up the hills by La Cienega. Its
+  // skid, samson post, gearbox, motor and wellhead go into the chunk's batch; the walking beam with its horsehead, the
+  // cranks with their weights, and the pitman arms, the bridle and the polished rod move (K.update), each one
+  // InstancedMesh to a chunk (K.flush). In its own frame the horsehead faces -z, the beam rocks on the saddle PJ.H up and
+  // the cranks turn on an axle under its tail; the horsehead is an arc about the saddle, so the bridle hangs plumb over the well.
+  const PJ = { H: 4.4, tail: 2.8, cy: 1.7, cr: 0.7, R: 4.6, arm: 0.62, bl: 1.6 };
+  const PAINT = ['#3a4a3a', '#2a3a5a', '#c8a030', '#6a2a24', '#4a4a50', '#2a5a5a', '#5a6a2a'];
+  const oneGeo = (fn) => { const t = new Batcher(); fn(t); return t.build().children[0].geometry; };   // (all VC.solid, white where the paint goes)
+  const PJ_BEAM = oneGeo((t) => {   // the I-beam, the horsehead, the equalizer under the tail, the bearing on the saddle (in the rest pose)
+    const z0 = -(PJ.R - 0.6), zc = (z0 + PJ.tail) / 2, L = PJ.tail - z0;
+    t.box(VC.solid, '#ffffff', 0, PJ.H + 0.34, zc, 0.22, 0.5, L);
+    for (const dy of [0.09, 0.59]) t.box(VC.solid, '#ffffff', 0, PJ.H + dy, zc, 0.46, 0.06, L);
+    const sh = new THREE.Shape(), a0 = -0.62, a1 = 0.45, r0 = PJ.R - 0.75;
+    for (let k = 0; k <= 10; k++) { const a = a0 + ((a1 - a0) * k) / 10; if (k) sh.lineTo(-PJ.R * Math.cos(a), PJ.R * Math.sin(a)); else sh.moveTo(-PJ.R * Math.cos(a), PJ.R * Math.sin(a)); }
+    for (let k = 10; k >= 0; k--) { const a = a0 + ((a1 - a0) * k) / 10; sh.lineTo(-r0 * Math.cos(a), r0 * Math.sin(a)); }
+    const hg = new THREE.ExtrudeGeometry(sh, { depth: 0.56, bevelEnabled: false }); hg.rotateY(-Math.PI / 2); hg.translate(0.28, PJ.H, 0);
+    t.addM(hg, VC.solid, new THREE.Matrix4(), '#ffffff');
+    t.box(VC.solid, '#d8d8d8', 0, PJ.H + 0.0, PJ.tail - 0.1, PJ.arm * 2 + 0.24, 0.2, 0.3);
+    t.box(VC.solid, '#c8c8c8', 0, PJ.H + 0.04, 0, 0.5, 0.18, 0.6);
+  });
+  const PJ_CRANK = oneGeo((t) => {   // the cranks either side of the gearbox, their weights, the pins (rest: the pins toward +z)
+    for (const e of [-1, 1]) {
+      t.box(VC.solid, '#ffffff', e * PJ.arm, PJ.cy, PJ.tail + (PJ.cr - 0.95) / 2, 0.12, 0.34, PJ.cr + 1.25);
+      t.box(VC.solid, '#d0d0d0', e * (PJ.arm + 0.1), PJ.cy, PJ.tail - 0.82, 0.22, 0.95, 0.75);
+      t.add(G.cyl8, VC.solid, e * (PJ.arm + 0.12), PJ.cy, PJ.tail + PJ.cr, 0.16, 0.22, 0.16, 0, 0, Math.PI / 2, '#8a8a8a');
+    }
+  });
+  const PJ_ROD = oneGeo((t) => t.box(VC.solid, '#ffffff', 0, 0.5, 0, 1, 1, 1));   // stretched between two points
+  K.pumpBuf = []; K.pumps = [];
+  K.pumpjack = (b, x, z, ry = 0, { s = 1, y = 0, col = pick(PAINT) } = {}) => {
+    const F = frame(b, x, y, z, s, ry), dark = '#3a3a3e';
+    F.box(VC.solid, '#a8a49c', 0, 0.06, 0.2, 2.6, 0.12, 10.4);   // the pad, the skid's rails and cross members
+    for (const e of [-1, 1]) F.box(VC.solid, col, e * 0.55, 0.26, 0.6, 0.16, 0.28, 7.6);
+    for (const zz of [-1.0, 1.2, 2.8, 4.1]) F.box(VC.solid, col, 0, 0.26, zz, 1.1, 0.2, 0.16);
+    for (const e of [-1, 1]) for (const [z0, z1] of [[-1.0, -0.08], [1.2, 0.08]]) F.beam(VC.solid, col, [e * 0.55, 0.4, z0], [e * 0.1, PJ.H - 0.14, z1], 0.16);   // the samson post, braced
+    for (const zz of [-0.55, 0.65]) F.box(VC.solid, col, 0, 2.2, zz, 0.75, 0.1, 0.1);
+    F.box(VC.solid, dark, 0, PJ.H - 0.12, 0, 0.44, 0.22, 0.5);   // the saddle
+    F.box(VC.solid, col, 0, 1.0, PJ.tail, 1.0, 1.3, 1.5);   // the gearbox, its axle, the motor and its belt guard
+    F.add(G.cyl8, VC.metal, 0, PJ.cy, PJ.tail, 0.22, PJ.arm * 2 + 0.34, 0.22, 0, 0, Math.PI / 2, '#8a8a8a');
+    F.add(G.cyl8, VC.solid, 0, 0.85, PJ.tail + 1.75, 0.7, 0.9, 0.7, 0, 0, Math.PI / 2, dark);
+    F.box(VC.solid, col, 0.6, 1.05, PJ.tail + 0.9, 0.12, 1.0, 1.9);
+    F.cyl(VC.metal, '#9a9ea4', 0, 0.5, -PJ.R, 0.17, 1.0, 'cyl8');   // the wellhead: the casing head, its valves, the stuffing box
+    for (const e of [-1, 1]) F.box(VC.metal, '#c8302a', e * 0.3, 0.62, -PJ.R, 0.26, 0.16, 0.16);
+    F.cyl(VC.metal, '#9a9ea4', 0, 1.15, -PJ.R, 0.11, 0.3, 'cyl8');
+    K.pumpBuf.push({ M: F.M.clone(), col: new THREE.Color(col), ph: rand(0, Math.PI * 2), w: rand(0.85, 1.2) });
+  };
+  // a lot of bare dirt behind a chain-link fence, a well or three nodding in it, the tanks, a shed, the signs on the fence
+  K.oilLot = (b, s, z0, z1, { x0 = 11.2, x1 = 38 } = {}) => {
+    const zc = -(z0 + z1) / 2, L = z1 - z0;
+    b.add(G.plane, VC.solid, s * (x0 + x1) / 2, 0.03, zc, x1 - x0, L, 1, -Math.PI / 2, 0, 0, pick(['#8a7a5a', '#7a6a4e', '#948468']));
+    K.chainLink(b, s * x0, -z0 - 0.4, s * x0, -z1 + 0.4, { barbed: true });
+    for (const z of [z0 + 0.4, z1 - 0.4]) K.chainLink(b, s * x0, -z, s * x1, -z, { barbed: true });
+    K.sign(b, 'NO TRESPASSING', { w: 512, h: 128, color: '#c8202a', bg: '#f4f4f0', font: SANS, weight: 700, size: 0.5, border: '#c8202a', k: 1.0 }, s * (x0 - 0.04), 1.3, zc + L * 0.25, 1.4, 0.36, 1, 0, face(s), 0);
+    K.sign(b, 'PACIFIC PETROLEUM · LEASE 14', { w: 768, h: 96, color: '#f4f0e8', bg: '#2a4a3a', font: SANS, weight: 700, size: 0.45, k: 0.9 }, s * (x0 - 0.04), 1.3, zc - L * 0.15, 2.6, 0.32, 1, 0, face(s), 0);
+    const n = L > 30 ? randi(2, 3) : randi(1, 2);
+    for (let k = 0; k < n; k++) K.pumpjack(b, s * rand(x0 + 7, x1 - 8), -(z0 + 6 + ((k + 0.5) * (L - 12)) / n), (chance(0.5) ? 0 : Math.PI) + rand(-0.25, 0.25), { s: rand(0.95, 1.25) });
+    for (let k = 0; k < 2; k++) {   // the tanks at the back, their ladders; the pipes along the ground
+      const tx = s * (x1 - 4), tz = zc + (k - 0.5) * Math.min(9, L * 0.35);
+      b.cyl(VC.solid, pick(['#e8e4dc', '#c8c4bc', '#9aa098']), tx, 2.2, tz, 2.2, 4.4, 'cyl'); b.add(G.cone, VC.solid, tx, 4.7, tz, 4.5, 0.6, 4.5, 0, 0, 0, '#a8a49c');
+      b.box(VC.metal, '#6a6a6e', tx - s * 2.25, 2.3, tz, 0.05, 4.6, 0.5);
+    }
+    b.box(VC.metal, '#5a5a5e', s * (x0 + x1) / 2, 0.15, zc, x1 - x0 - 8, 0.12, 0.12);
+    b.block(VC.solid, '#b8b0a0', s * (x1 - 9), 0, zc - L * 0.38, 3.4, 2.6, 4); b.add(G.box, VC.metal, s * (x1 - 9), 2.7, zc - L * 0.38, 3.8, 0.08, 4.4, 0, 0, 0.08, '#8a8e94');   // the shed
+    for (let k = 0; k < 7; k++) b.add(G.sphLow, VC.solid, s * rand(x0 + 1, x1 - 1), 0.25, zc + rand(-L / 2 + 1, L / 2 - 1), rand(0.5, 1.1), rand(0.35, 0.6), rand(0.5, 1.1), 0, rand(0, 3), 0, pick(['#8a7a4a', '#6a6a3a', '#9a8a5a']));   // the weeds
+  };
+  const _pm = new THREE.Matrix4(), _pn = new THREE.Matrix4(), _pr = new THREE.Matrix4(), _pa = new THREE.Vector3(), _pc = new THREE.Vector3(), _pd = new THREE.Vector3(), _pq = new THREE.Quaternion(), _ps = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
+  const STEEL = new THREE.Color('#2a2a2e'), ROD = new THREE.Color('#d8dce2');
+  // flush a built chunk: its smoke, and its pumpjacks' moving parts
+  K.flush = (g) => {
+    K.flushSmoke(g);
+    const list = K.pumpBuf.splice(0), n = list.length;
+    if (!n) return g;
+    const mk = (geo, count) => { const m = new THREE.InstancedMesh(geo, VC.solid, count); m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); g.add(m); return m; };
+    const beamM = mk(PJ_BEAM, n), crankM = mk(PJ_CRANK, n), rodM = mk(PJ_ROD, n * 6);
+    list.forEach((p, i) => { beamM.setColorAt(i, p.col); crankM.setColorAt(i, p.col); for (let k = 0; k < 6; k++) rodM.setColorAt(i * 6 + k, k < 2 ? p.col : k === 5 ? ROD : STEEL); });
+    const rod = (i, M, t) => {   // rod i from _pa to _pc (in the pumpjack's frame), t thick
+      _pd.subVectors(_pc, _pa); const len = Math.max(_pd.length(), 1e-3);
+      _pq.setFromUnitVectors(UP, _pd.divideScalar(len));
+      rodM.setMatrixAt(i, _pr.compose(_pa, _pq, _ps.set(t, len, t)).premultiply(M));
+    };
+    const step = (t) => {
+      for (let i = 0; i < n; i++) {
+        const { M, w, ph } = list[i], f = t * w + ph, th = Math.asin((-PJ.cr / PJ.tail) * Math.sin(f));
+        beamM.setMatrixAt(i, _pm.copy(M).multiply(_pn.makeTranslation(0, PJ.H, 0)).multiply(_pr.makeRotationX(th)).multiply(_pn.makeTranslation(0, -PJ.H, 0)));
+        crankM.setMatrixAt(i, _pm.copy(M).multiply(_pn.makeTranslation(0, PJ.cy, PJ.tail)).multiply(_pr.makeRotationX(-f)).multiply(_pn.makeTranslation(0, -PJ.cy, -PJ.tail)));
+        const ey = PJ.H - 0.1 - PJ.tail * Math.sin(th), ez = PJ.tail * Math.cos(th), py = PJ.cy + PJ.cr * Math.sin(f), pz = PJ.tail + PJ.cr * Math.cos(f), yc = PJ.H - PJ.bl + PJ.R * th, xa = PJ.arm + 0.12;
+        _pa.set(-xa, py, pz); _pc.set(-xa, ey, ez); rod(i * 6, M, 0.14);   // the pitman arms
+        _pa.set(xa, py, pz); _pc.set(xa, ey, ez); rod(i * 6 + 1, M, 0.14);
+        _pa.set(-0.12, yc, -PJ.R); _pc.set(-0.12, PJ.H, -PJ.R); rod(i * 6 + 2, M, 0.035);   // the bridle's two cables, the carrier bar, the polished rod
+        _pa.set(0.12, yc, -PJ.R); _pc.set(0.12, PJ.H, -PJ.R); rod(i * 6 + 3, M, 0.035);
+        _pa.set(-0.24, yc - 0.06, -PJ.R); _pc.set(0.24, yc - 0.06, -PJ.R); rod(i * 6 + 4, M, 0.1);
+        _pa.set(0, 1.25, -PJ.R); _pc.set(0, yc - 0.06, -PJ.R); rod(i * 6 + 5, M, 0.06);
+      }
+      beamM.instanceMatrix.needsUpdate = crankM.instanceMatrix.needsUpdate = rodM.instanceMatrix.needsUpdate = true;
+    };
+    step(0); K.pumps.push(step);
+    return g;
+  };
+  // the red lamps that blink: over the stage doors, on the masts
+  K.blinkRed = basic({ color: hdr('#ff2a1a', 3) });
+
   K.update = (t) => {
     K.water.userData.scroll.offset.set(t * 0.006, t * 0.018);
     for (const m of K.smokes) m.userData.update(t);
+    for (const step of K.pumps) step(t);
     const on = Math.floor(t * 3.2) % 2;
     K.chaseA.color.set('#ffe0a0').multiplyScalar(on ? 3.4 : 0.5); K.chaseB.color.set('#ffe0a0').multiplyScalar(on ? 0.5 : 3.4);
+    K.blinkRed.color.set('#ff2a1a').multiplyScalar(Math.sin(t * 3.1) > 0.2 ? 3.2 : 0.3);
   };
   return K;
 }

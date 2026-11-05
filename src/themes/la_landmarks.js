@@ -1,8 +1,8 @@
-// Los Angeles's landmark scenes (the two on the beach are in la_beach.js), in route order: Union Station and Olvera
-// Street; Disney Hall's steel sails and Angels Flight; the Sixth Street Viaduct's arches over the river; the Coliseum's
-// peristyle and its flame; the glowing pylons of LAX and the Theme Building, a jet coming in over them; Urban Light;
-// Beverly Hills and Rodeo Drive; the Sunset Strip's billboards and clubs over the lights of the basin; the Walk of Fame,
-// the Chinese Theatre and a premiere; Griffith Observatory on its hill, the whole city spread out below it.
+// Los Angeles's landmark scenes (the two on the beach are in la_beach.js, eight more in la_sights.js and la_hills.js):
+// Union Station and Olvera Street; Disney Hall's steel sails and Angels Flight; the Sixth Street Viaduct's arches over the
+// river; the Coliseum's peristyle and its flame; the glowing pylons of LAX and the Theme Building, a jet coming in over
+// them; Urban Light; Beverly Hills and Rodeo Drive; the Sunset Strip's billboards and clubs over the lights of the basin;
+// the Walk of Fame, the Chinese Theatre and a premiere; Griffith Observatory on its hill, the whole city spread out below it.
 // Big buildings stand back from the track and well ahead; anything over the track is 11 m up or more.
 import { THREE, Batcher, VC, G, std, basic, hdr, canvasTex, planeUV, buildingGeo, shade, CHUNK_LEN, rand, randi, pick, chance } from '../core.js';
 import { at, farGround } from './common.js';
@@ -14,6 +14,7 @@ import { quad } from './la_beach.js';
 import { SANS, SERIF, SCRIPT, BLADE, DECO, NEON, X0, STUCCO, PASTEL, HOLLY_SIGNS, DOWNTOWN_SIGNS, GI, face, hipRoof, gableRoof } from './la_kit.js';
 
 const ARCH = new THREE.TorusGeometry(0.5, 0.08, 6, 12, Math.PI);   // a half ring springing from y = 0 in the xy plane
+const RIB = new THREE.TorusGeometry(1, 0.012, 4, 40);   // a thin unit ring standing in the xy plane (a dome's ribs)
 const T = (x, y, z) => new THREE.Matrix4().makeTranslation(x, y, z);
 function gridTex() {   // the basin at night from the hills: the street grid in sodium orange, the boulevards brighter and whiter, windows between, the dark parks
   return canvasTex(512, 512, (g, w, h) => {
@@ -99,11 +100,24 @@ export function laLandmarks(K) {
       F.add(G.box, VC.solid, x + (ry ? 0.06 : 0), 26, z + (ry ? -0.5 : 0.06), ry ? 0.03 : 1.1, 0.16, ry ? 1.1 : 0.03, 0, 0, 0, '#1a1a1a');
     }
     F.addM(hipRoof(9.4, 9.4, 4.6), K.tileMat, T(-12, 31, 0.7), '#ffffff');
+    F.box(VC.solid, '#d8c8b0', -12, 30.7, 0.12, 8.4, 0.6, 0.3); for (const e of [-1, 1]) F.box(VC.solid, '#d8c8b0', -12 + e * 3.9, 30.9, 0.2, 0.5, 1.0, 0.5);   // the tower's cornice, its corner piers
+    F.box(VC.solid, '#5a3a2a', 0, H - 0.1, 0.45, L + 0.9, 0.2, 0.12);   // the fascia under the long roof, the tiled wainscot along the foot
+    F.box(VC.solid, '#7a5a48', 0, 0.55, 0.05, L, 1.1, 0.06); for (let x = -31.5; x <= 31.5; x += 0.9) F.box(VC.solid, '#c8a040', x, 1.12, 0.09, 0.4, 0.06, 0.02);
+    for (const [x0, x1] of [[-31, -19], [-6, 0]]) {   // the arcades either side of the tower: columns, round arches, the tile pent over them
+      const n = Math.round((x1 - x0) / 3), bay = (x1 - x0) / n;
+      for (let k = 0; k <= n; k++) { const x = x0 + k * bay; F.cyl(VC.solid, '#f4ecdc', x, 2.0, 3.4, 0.22, 4.0, 'cyl8'); F.box(VC.solid, '#e8dcc8', x, 4.1, 3.4, 0.6, 0.2, 0.6); if (k < n) F.addM(ARCH, VC.solid, new THREE.Matrix4().makeScale(bay, bay * 0.7, 4).setPosition(x + bay / 2, 4.2, 3.4), '#f4ecdc'); }
+      F.box(VC.solid, wall, (x0 + x1) / 2, 5.4, 3.4, x1 - x0 + 0.6, 0.9, 0.5);
+      F.add(G.box, K.tileMat, (x0 + x1) / 2, 6.25, 1.8, x1 - x0 + 1, 0.1, 3.6, -0.32, 0, 0, '#ffffff');
+      F.box(VC.solid, '#c8b8a0', (x0 + x1) / 2, 0.06, 1.8, x1 - x0, 0.12, 3.6);
+      for (let x = x0 + bay; x < x1; x += bay * 2) F.ell(VC.glow, hdr('#ffd9a0', 2.0), x, 4.4, 1.8, 0.18, 0.24, 0.18, true);
+    }
+    for (const e of [-1, 1]) { F.box(VC.metal, '#1a1a1e', 6 + e * 4.4, 4.2, 3.7, 0.5, 0.7, 0.5); F.box(VC.glow, hdr('#ffd9a0', 2.2), 6 + e * 4.4, 4.2, 3.7, 0.38, 0.55, 0.38); F.add(G.cone4, VC.metal, 6 + e * 4.4, 4.75, 3.7, 0.8, 0.4, 0.8, 0, 0, 0, '#1a1a1e'); }   // the lanterns at the great arch
+    F.addM(ARCH, VC.solid, new THREE.Matrix4().makeScale(7.8, 7.8, 2).setPosition(6, 7.6, 3.62), '#c8a880');   // the moulding round it
     for (const [x, z] of [[17, -16], [24, -30], [17, -62], [24, -74]]) K.palm(b, x, z, rand(1.1, 1.3));
     palmRow(b, 9.2, 2, 78, [14, 18]);
     for (let z = 10; z < 76; z += 16) K.lamp(b, 12.6, -z, 1, { kind: 'twin' });
     K.crowd(b, 13, 26, 4, 76, 14, { bag: true });
-    for (let k = 0; k < 3; k++) K.car(b, 5.2, -rand(8, 72), pick([-1, 1]), { kind: pick(['sedan', 'suv']), col: '#f2c230', lit: true });   // the taxis at the kerb
+    for (let k = 0; k < 3; k++) K.car(b, 5.2, -rand(8, 72), pick([-1, 1]), { kind: 'taxi', lit: true });   // the taxis at the kerb
     // the left: Olvera Street's stalls under papel picado, the old adobe, the plaza with its kiosk and figs, the Plaza church
     K.kerbLane(b, -1, { x1: 12 }); farGround(b, -1, '#7a6a52');
     K.pave(b, -26, -40, 28, 80, 0.035);
@@ -469,7 +483,15 @@ export function laLandmarks(K) {
     K.sign(F, 'CHINESE', { w: 1024, h: 192, color: '#ffd890', bg: '#2a1418', font: DECO, size: 0.72, k: 1.5 }, 0, 9.4, 0.12, 8, 1.5, 1);
     const R1 = roofGeo(16, 9, 4.6, { lift: 0.9, eave: 1.8 }), R2 = roofGeo(9, 6, 3.2, { lift: 0.8, eave: 1.2 });
     F.addM(R1.roof, VC.metal, T(0, 13.6, -3.5), bronze); F.addM(K.tiledBox(9, 3, 6, 2.5), K.stuccoMat, T(0, 18.5, -3.5), '#b8483a'); F.addM(R2.roof, VC.metal, T(0, 20, -3.5), bronze);
-    for (const e of [-1, 1]) { F.ell(VC.solid, '#5a5048', e * 4.2, 0.8, 1.6, 0.5, 0.6, 0.7); F.ell(VC.solid, '#5a5048', e * 4.2, 1.5, 1.3, 0.4, 0.4, 0.4); }   // the guardian dogs at the doors
+    for (const e of [-1, 1]) { F.ell(VC.solid, '#5a5048', e * 4.2, 0.8, 1.6, 0.5, 0.6, 0.7); F.ell(VC.solid, '#5a5048', e * 4.2, 1.5, 1.3, 0.4, 0.4, 0.4); F.box(VC.solid, '#7a6a5a', e * 4.2, 0.25, 1.5, 1.2, 0.5, 1.4); }   // the guardian dogs at the doors on their plinths
+    for (let k = 0; k <= 16; k++) { const u = k / 16, x = -6 + u * 12, y = 11.1 + Math.sin(u * Math.PI * 3) * 0.45; F.ell(VC.solid, k === 0 ? '#c8a040' : '#2a7a5a', x, y, 0.2, 0.42 - Math.abs(u - 0.5) * 0.3, 0.38, 0.22, true); }   // the dragon across the front
+    F.box(VC.solid, '#2a5a4a', 0, 12.5, 0.09, 16, 0.5, 0.1); F.box(VC.solid, '#c8a040', 0, 12.2, 0.1, 16, 0.08, 0.1);   // the green band under the roof, its gilt edge
+    for (const e of [-1, 1]) for (const [y, xx] of [[13.6, 8.6], [20, 5.2]]) F.add(G.cone4, VC.metal, e * xx, y + 0.5, -3.5 + 4.9 * (y > 15 ? 0.6 : 1), 0.4, 1.0, 0.4, 0, 0, -e * 0.5, bronze);   // the eaves' tips turned up
+    for (const e of [-1, 1]) for (const z of [-0.6, -6.4]) { F.box(VC.solid, '#5a1a14', e * 7.4, 12.9, z, 0.04, 0.5, 0.04); F.ell(VC.glow, hdr('#ff6a3a', 2.2), e * 7.4, 12.4, z, 0.22, 0.3, 0.22, true); }   // lanterns under the eaves
+    for (const e of [-1, 1]) {   // the coral pylons at the forecourt's corners, their bronze caps
+      const O = frame(b, 29 - 7, 0, -42 + e * 12.5, 1, 0);
+      O.addM(frustum4(0.7, 1.4, 9), VC.solid, T(0, 0, 0), coral); O.add(G.cone4, VC.metal, 0, 9.6, 0, 1.4, 1.2, 1.4, 0, 0, 0, bronze); O.box(VC.metal, bronze, 0, 4.5, 0, 1.2, 0.3, 1.2);
+    }
     for (const zz of [-62, -78]) { b.cyl(VC.solid, '#f2ece4', 13.4, 7, zz, 1.2, 14, 'cyl'); b.box(VC.solid, '#e8dcc8', 13.4, 14.3, zz, 3, 0.6, 3); elephant(b, 13.4, 14.6, zz, -Math.PI / 2); }
     b.box(VC.solid, '#e8dcc8', 13.4, 13.4, -70, 2.2, 1.6, 17);
     const CR = frame(b, 40, 0, -88, 1, 0);   // the record-stack tower: a pile of discs and their glass, the needle, the light spelling HOLLYWOOD
@@ -510,6 +532,11 @@ export function laLandmarks(K) {
     const F = frame(b, 44, TY, -54, 1, face(1)), white = '#f4f0ea', dome = '#7aa094';
     F.addM(K.tiledBox(34, 15, 28, 2.5), K.stuccoMat, T(0, 7.5, -14), white);
     F.cyl(VC.solid, white, 0, 16.5, -14, 12.6, 4, 'cyl'); F.add(G.sph, VC.metal, 0, 18.4, -14, 25, 21, 25, 0, 0, 0, dome);
+    for (let k = 0; k < 6; k++) F.add(RIB, VC.metal, 0, 18.4, -14, 12.62, 10.62, 12.62, 0, (k * Math.PI) / 6, 0, '#5a7a6e');   // the dome's ribs
+    for (let k = 0; k < 16; k++) { const a = (k / 16) * Math.PI * 2; F.box(VC.solid, '#e8e2d8', Math.cos(a) * 12.7, 16.5, -14 + Math.sin(a) * 12.7, 0.6, 4, 0.6); }   // the drum's pilasters
+    F.cyl(VC.solid, '#e8e2d8', 0, 18.6, -14, 12.9, 0.4, 'cyl'); F.cyl(VC.metal, '#c8a050', 0, 29, -14, 0.4, 1.4, 'cyl8');
+    for (let x = -12.5; x <= 12.5; x += 5) F.box(VC.solid, '#e8e2d8', x, 9, 0.2, 0.35, 12, 0.3);   // the front's deco fins, between its tall windows
+    F.box(VC.solid, '#e8e2d8', 0, 15.2, 0.25, 34.4, 0.5, 0.5);
     for (const e of [-1, 1]) {
       F.addM(K.tiledBox(26, 10, 12, 2.5), K.stuccoMat, T(e * 30, 5, -6), white);
       for (let k = 0; k < 6; k++) { F.box(VC.solid, white, e * (19.5 + k * 4), 4.4, 0.6, 0.9, 8.8, 0.9); F.box(VC.glow, hdr('#ffe0b0', 0.9), e * (21.5 + k * 4), 4.4, 0.05, 2.6, 7, 0.04); }
@@ -532,13 +559,14 @@ export function laLandmarks(K) {
     return { b, extra: [lights] };
   };
 
-  const done = (fn) => () => { const r = fn(), g = K.flushSmoke((r.b || r).build()); for (const o of r.extra || []) g.add(o); return g; };
+  const done = (fn) => () => { const r = fn(), g = K.flush((r.b || r).build()); for (const o of r.extra || []) g.add(o); return g; };
   const LIST = [['union', '联合车站 · 奥维拉街', 'UNION STATION · OLVERA STREET', union], ['bunker', '迪士尼音乐厅 · 天使铁路', 'DISNEY HALL · ANGELS FLIGHT', bunker],
     ['viaduct', '第六街高架桥', 'SIXTH STREET VIADUCT', viaduct], ['coliseum', '洛杉矶纪念体育场', 'MEMORIAL COLISEUM', coliseum], ['lax', '洛杉矶国际机场', 'LAX', lax],
     ['urbanLight', '城市之光 · 艺术博物馆', 'URBAN LIGHT · LACMA', urbanLight], ['beverly', '比佛利山庄 · 罗迪欧大道', 'BEVERLY HILLS · RODEO DRIVE', beverly],
     ['sunset', '日落大道', 'SUNSET STRIP', sunset], ['hollywood', '星光大道 · 中国剧院', 'WALK OF FAME · CHINESE THEATRE', hollywood], ['griffith', '格里菲斯天文台', 'GRIFFITH OBSERVATORY', griffith]];
   return {
     landmarks: Object.fromEntries(LIST.map(([key, name, en, fn]) => [key, { key, name, en, build: done(fn) }])),
+    cityLights, slope, palmRow,   // (for la_sights.js and la_hills.js; their lights are shown and hidden here too)
     update(t, camZ = null) {
       if (camZ !== null) for (const m of grids) { if (!m.parent) continue; const ahead = camZ - m.parent.matrixWorld.elements[14]; m.visible = ahead > -400 && ahead < 130; }   // (its chunk's start, from the camera)
       led.forEach((m, i) => m.color.setHSL((t * 0.05 + i / 3) % 1, 0.95, 0.5).multiplyScalar(1.25));

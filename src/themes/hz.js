@@ -1,15 +1,17 @@
 // Hangzhou: misty blue-hour West Lake, white-wall black-tile houses, lanterns, pagodas, Fuxing bullet trains.
 // The run goes round a loop of three stretches: West Lake's streets (now with their vendors, kiosks and newsstands), the
 // plane-tree avenue of Beishan Street, and the Qiantang at Qianjiang New City, where the towers of both banks play the
-// light show (hz_kit.js, hz_show.js, hz_landmarks.js); then back through the avenue to the lake.
+// light show (hz_kit.js, hz_show.js, hz_landmarks.js) and across the water stand the Gate of Hangzhou and the Big Lotus,
+// with two bridges to run under (hz_across.js); then back through the avenue to the lake.
 import { THREE, Batcher, VC, G, std, basic, hdr, windowTex, stripeTex, buildingGeo, canvasTex,
-  CHUNK_LEN, rand, randi, pick, chance, clamp, smooth } from '../core.js';
+  CHUNK_LEN, rand, randi, pick, chance } from '../core.js';
 import { barrierStyle, coinGeometry, coinMaterial } from '../props.js';
 import { treeKit, wutongKit } from './trees.js';
 import { makeTrack, facadeMat, lamp, skyline, skyTex, SKY_VC, polar, at, EDGE, DISC, waterMat, screenMat, screenTint, people, RING } from './common.js';
 import { makeKit, GLYPHS as KIT_GLYPHS, SIGN } from './hz_kit.js';
 import { makeShow } from './hz_show.js';
 import { hzLandmarks } from './hz_landmarks.js';
+import { acrossKit } from './hz_across.js';
 
 const RED = '#d7262e', TILE = '#2b2f36', WALL = '#d6d1c4';
 const SIGNS = ['龙井茶', '酒', '客栈', '丝绸', '面馆', '西湖', '河坊街', '茶', '药铺', '书局'];
@@ -17,10 +19,13 @@ const SIGNS = ['龙井茶', '酒', '客栈', '丝绸', '面馆', '西湖', '河�
 export const GLYPHS = [...new Set(KIT_GLYPHS + SIGNS.join('') + '西湖断桥苏堤灵隐钱塘最忆是杭州亚运')].join('');
 
 // The loop, chunk by chunk (each landmark heads four chunks, ROUTE gives their order): West Lake, the avenue on its lake
-// side and its city side, the Qiantang, the avenue again. The run starts at the Three Pools.
+// side and its city side, the Qiantang, the avenue again. The run starts at the Three Pools. By the river some chunks
+// have a sight of their own across the water (hz_across.js): the Gate of Hangzhou, then the Big Lotus beside it (just
+// upstream of it, as from the north bank) and the Third Bridge beyond, later the New Pengbu Bridge. A sight never
+// stands right behind a bridge, whose deck would hide its foot.
 const ROUTE = ['santan', 'leifeng', 'balcony', 'qianjiang', 'lightshow'];
 const ZONES = ['lake', 'lake', 'lake', 'lake', 'lake', 'lake', 'avenueL', 'avenueR',
-  'river', 'river', 'river', 'river', 'river', 'river', 'river', 'river', 'river', 'river', 'avenueR', 'avenueL'];
+  'river', 'gate', 'lotus', 'third', 'river', 'river', 'pengbu', 'river', 'river', 'river', 'avenueR', 'avenueL'];
 
 // vertical shop-sign atlas (dark lacquer boards with gold characters)
 function verticalSigns() {
@@ -53,8 +58,8 @@ function plaqueTex(text) {
 
 export default {
   id: 'hz', name: '杭州', en: 'HANGZHOU', tagline: '人间天堂 · 西湖烟雨',
-  blurb: '暮色里的西湖，红灯笼、白墙黛瓦，复兴号从湖边疾驰而过。湖边有糖画摊、卖莲蓬的阿婆、葱包桧和定胜糕的小车、灰色的小商亭、墨绿色的报刊亭和成排的小红车，三潭映月的烛光、雷峰塔和断桥一路相伴；穿过北山街两侧树冠合拢的梧桐大道，来到钱塘江边的钱江新城：城市阳台悬在江上，金球与新月形的大剧院“日月同辉”，两岸几十栋高楼连成一幅灯光秀，倒映在江面上，再沿着梧桐大道回到西湖。',
-  sights: ['三潭映月', '雷峰塔 · 断桥', '北山街 · 梧桐大道', '城市阳台', '钱江新城 金球 · 大剧院', '钱江灯光秀'],
+  blurb: '暮色里的西湖，红灯笼、白墙黛瓦，复兴号从湖边疾驰而过。湖边有糖画摊、卖莲蓬的阿婆、葱包桧和定胜糕的小车、灰色的小商亭、墨绿色的报刊亭和成排的小红车，三潭映月的烛光、雷峰塔和断桥一路相伴；穿过北山街两侧树冠合拢的梧桐大道，来到钱塘江边的钱江新城：城市阳台悬在江上，金球与新月形的大剧院“日月同辉”，两岸几十栋高楼连成一幅灯光秀，倒映在江面上，对岸是杭州之门和大莲花，彭埠大桥、钱江三桥从头顶跨过，再沿着梧桐大道回到西湖。',
+  sights: ['三潭映月', '雷峰塔 · 断桥', '北山街 · 梧桐大道', '城市阳台', '杭州之门 · 大莲花', '钱江新城 金球 · 大剧院', '彭埠大桥 · 钱江三桥', '钱江灯光秀'],
   accent: '#ff5a6e', accent2: '#ffd77a', portal: '#ff5a6e',
   sky: { top: '#0c1d3d', mid: '#3a6a8a', bot: '#f0b3ae', glow: '#ff9aa8', glowK: 0.4, sun: '#fff4dc',
     sunDir: [0.32, 0.22, -1], sunSize: 0.005, sunK: 1.1, moon: true, cloud: 0.35, cloudColor: '#6f8aa8', horizon: -0.08, stars: true },
@@ -148,14 +153,6 @@ export default {
           b.box(VC.glow, hdr('#ffd77a', 1.6), sx, top + 0.1, sz, sw + 0.12, 0.05, 0.1);
         }
         z += len + rand(0.3, 2.5);
-      }
-      if (chance(0.5)) { // Qianjiang modern towers behind
-        for (let k = 0; k < 2; k++) {
-          const w = rand(10, 16), h = rand(40, 85), x = side * rand(30, 45), zc = -rand(10, 70);
-          b.addM(buildingGeo(w, h, w, tower, 1.6, 3.2), towerMat, at(x, 0, zc), '#ffffff');
-          const col = hdr(pick(['#ff5a6e', '#59d8ff', '#ffd77a', '#b26bff']), 3);
-          for (let y = 8; y < h; y += 12) b.box(VC.glow, col, x, y, zc, w + 0.1, 0.25, w + 0.1);
-        }
       }
     };
 
@@ -455,23 +452,25 @@ export default {
 
     // ---------- the Qiantang at Qianjiang New City ----------
     // The river on the left: its steel railing under a line of blue light, a tide warning, people at the railing, a
-    // cruise boat now and then, the far bank's towers playing the show and streaking the water with its colours. On the
-    // right the riverside park and its cycle lane, and behind it the towers of the new city, every one of them in the show.
-    const riverDecor = () => {
+    // cruise boat now and then, the far bank's towers playing the show and streaking the water with its colours (or one
+    // of the sights across the river, or a bridge overhead). On the right the riverside park and its cycle lane, and
+    // behind it the towers of the new city, every one of them in the show.
+    const AC = acrossKit(K);
+    const riverDecor = (across) => {
       const b = new Batcher();
       const L = lakeSide(b, { willows: false, lotus: 0, modern: true }), gl = [];
-      K.farBank(b);
-      if (chance(0.45)) K.cruise(b, -rand(40, 85), -rand(22, 58));
+      const span = across ? across(b) : K.farBank(b);   // a bridge gives back the stretch it crosses
+      if (!span && chance(0.45)) K.cruise(b, -rand(40, 85), -rand(22, 58));
       if (chance(0.4)) { const z = slot(L, 1.4); if (z !== null) K.tideSign(b, -(EDGE + 6.6), -z, -1); }
       if (chance(0.35)) { const z = slot(L, 1.8); if (z !== null) { K.glowSeller(b, -(EDGE + 2.2), -z, -1); gl.push([z - 1.6, z + 1.6]); } }
       K.spectators(b, -(EDGE + 2.6), -(EDGE + 6.6), 2, CHUNK_LEN - 2, randi(5, 10), -1, gl);
       K.strollers(b, -(EDGE + 0.5), -(EDGE + 2.0), 2, CHUNK_LEN - 2, randi(2, 5), { gaps: gl });
       K.riverPark(b, 1, 0, CHUNK_LEN);
-      K.cityRow(b, 1);
+      if (span) { K.cityRow(b, 1, { z1: span[0] }); K.cityRow(b, 1, { z0: span[1] }); } else K.cityRow(b, 1);
       K.strollers(b, EDGE + 0.5, EDGE + 2.8, 2, CHUNK_LEN - 2, randi(4, 8));
       return K.flushSteam(b.build());
     };
-    const decor = (zone) => (zone === 'river' ? riverDecor() : zone === 'avenueL' ? avenueDecor('lake') : zone === 'avenueR' ? avenueDecor('river') : lakeDecor());
+    const decor = (zone) => (zone === 'lake' ? lakeDecor() : zone === 'avenueL' ? avenueDecor('lake') : zone === 'avenueR' ? avenueDecor('river') : riverDecor(AC[zone]));
 
     const LM = hzLandmarks(K, S, { lakeSide, kit });
     const byKey = {
@@ -481,9 +480,9 @@ export default {
     };
     for (const l of LM.landmarks) byKey[l.key] = l;
 
+    // no towers on the horizon: only the hills round the lake, Leifeng Pagoda and Baochu Pagoda
     const sky = skyline({
-      tex: skyTex({ wall: '#0e1a28', lit: ['#bfe3ff', '#ffd27a', '#ffffff'], chance: 0.3 }),
-      colors: ['#c7d8ff', '#9db4d6'], count: 40, r: [640, 820], h: [60, 170], k: 1.6, gapAhead: 1.1,
+      tex: skyTex({ wall: '#0e1a28', lit: ['#bfe3ff', '#ffd27a', '#ffffff'], chance: 0.3 }), count: 0,
       landmarks: [
         (b) => { // layered ink-wash mountains
           const layers = [[520, '#2c4658', 70, 130], [610, '#3e5d72', 90, 170], [700, '#57778c', 110, 210]];
@@ -514,75 +513,8 @@ export default {
           b.add(G.cyl6, SKY_VC, x, 40, z, 7, 90, 7, 0, ry, 0, '#4a4a55');
           b.add(G.cone, SKY_VC, x, 92, z, 3, 16, 3, 0, ry, 0, hdr('#ffd77a', 2));
         },
-        (b, mat) => { // Qianjiang CBD with the "sun and moon"
-          for (let i = 0; i < 12; i++) {
-            const [x, z, ry] = polar(40 + i * 3.2, 760 + rand(-30, 30)), h = rand(110, 230), w = rand(20, 34);
-            b.addM(buildingGeo(w, h + 95, w, { cols: 8, rows: 16 }, 3.4, 4.2), mat, at(x, -95, z, ry), '#ffffff');
-            const col = hdr(pick(['#ff5a6e', '#59d8ff', '#ffd77a', '#b26bff']), 2.2);
-            for (let y = -40; y < h; y += 26) b.add(G.box, SKY_VC, x, y, z, w + 0.6, 1.4, w + 0.6, 0, ry, 0, col);
-          }
-          const [sx, sz] = polar(52, 680);
-          b.sph(SKY_VC, hdr('#ffc94d', 2.8), sx, -55, sz, 36);
-          const [mx, mz, mry] = polar(60, 690);
-          b.add(G.cyl, SKY_VC, mx, -50, mz, 80, 10, 80, Math.PI / 2 - 0.2, mry, 0, hdr('#dfe8ff', 1.8));
-        },
       ],
     });
-
-    // ---------- the river's horizon, faded in while the run is by the Qiantang ----------
-    // Both banks' towers playing the show, the Gate of Hangzhou (two towers leaning together into a gate) across the river
-    // left of the track's end, the Olympic Center's "Big Lotus" further left, the Fuxing Bridge's lit arches across the
-    // river at the far end. Leifeng Pagoda (-22°) and Baochu Pagoda (14°) are left clear.
-    const rsMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, transparent: true, opacity: 0, depthWrite: false });
-    const riverSky = (() => {
-      const b = new Batcher();
-      const showFace = (x, z, ry, w, y0, y1, deg, r) => {   // a show screen on the face toward the camera
-        const a = -ry, wd = ((w / r) * 180) / Math.PI;
-        b.add(G.plane, S.sky, x - Math.sin(a) * 0.4, (y0 + y1) / 2, z + Math.cos(a) * 0.4, w * 0.94, y1 - y0, 1, 0, ry, 0, S.tint(((deg - wd / 2) / 30) * 80, rand(0.85, 1.1), (wd / 30) * 80));
-      };
-      const tower = (deg, r, w, h) => {
-        const [x, z, ry] = polar(deg, r), a = -ry, d = w * 0.8;
-        b.add(G.box, rsMat, x, (h - 95) / 2, z, w, h + 95, d, 0, ry, 0, '#141c28');
-        showFace(x - Math.sin(a) * d / 2, z + Math.cos(a) * d / 2, ry, w, 2, h - 4, deg, r);
-        b.add(G.box, rsMat, x, h + 1, z, w + 0.6, 2, d + 0.6, 0, ry, 0, hdr(pick(['#bfe8ff', '#ffffff', '#ffd27a']), 1.6));
-      };
-      for (const deg of [7, 10, 19, 23, 27, 31, 35, 39, 43, 47, 51]) tower(deg + rand(-1, 1), rand(400, 600), rand(22, 40), rand(90, 220));
-      for (const deg of [-74, -68, -62, -56, -50, -44, -27]) tower(deg + rand(-1, 1), rand(480, 650), rand(22, 36), rand(70, 170));
-      { // the Gate of Hangzhou: two towers of stacked blocks whose inner edges lean together as they rise
-        const deg = -13, r = 640, [gx, gz, gry] = polar(deg, r), ca = Math.cos(gry), sa = Math.sin(gry);
-        for (const e of [-1, 1]) for (let k = 0; k < 9; k++) {
-          const off = e * (30 - k * k * 0.22), y = -40 + k * 18 + 9, x = gx + ca * off, z = gz - sa * off;
-          b.add(G.box, rsMat, x, y, z, 20, 18, 16, 0, gry, 0, '#18202c');
-          b.add(G.box, rsMat, x, y + 8.6, z, 20.3, 0.8, 16.3, 0, gry, 0, hdr('#ffe2b0', 1.3));
-          if (k > 1) showFace(x - Math.sin(-gry) * 8, z + Math.cos(-gry) * 8, gry, 20, y - 8.5, y + 8, deg + (off / r) * (180 / Math.PI), r);
-        }
-      }
-      { // the Big Lotus: the stadium's ring of white petals, lit warm
-        const [cx, cz] = polar(-34, 470);
-        for (let k = 0; k < 28; k++) {
-          const a = (k / 28) * Math.PI * 2;
-          b.add(G.cone8, rsMat, cx + Math.cos(a) * 44, 12, cz + Math.sin(a) * 44, 14, 60, 5, 0.45, Math.PI / 2 - a, 0, hdr(k % 2 ? '#f4f0ff' : '#fff0dc', 1.25));
-        }
-        b.add(G.cyl, rsMat, cx, -20, cz, 96, 30, 96, 0, 0, 0, '#1a1e28');
-      }
-      { // the Fuxing Bridge across the river: two decks on their piers, lit arches springing over them
-        const [x1, z1] = polar(-40, 430), [x2, z2] = polar(4, 360), dx = x2 - x1, dz = z2 - z1, L = Math.hypot(dx, dz), ry = Math.atan2(dx, dz);
-        const P = (t) => [x1 + dx * t, z1 + dz * t];
-        for (const y of [8, 14]) { b.add(G.box, rsMat, x1 + dx / 2, y, z1 + dz / 2, 3, 2.4, L, 0, ry, 0, '#1a1e26'); b.add(G.box, rsMat, x1 + dx / 2, y + 1.3, z1 + dz / 2, 3.2, 0.5, L, 0, ry, 0, hdr('#bfe0ff', 1.8)); }
-        for (let k = 0; k <= 6; k++) { const [px, pz] = P(k / 6); b.add(G.box, rsMat, px, -30, pz, 6, 76, 6, 0, ry, 0, '#141820'); }
-        for (let k = 0; k < 6; k++) for (let j = 0; j < 12; j++) {
-          const [ax, az] = P((k + j / 12) / 6), [bx, bz] = P((k + (j + 1) / 12) / 6);
-          const y0 = 14 + Math.sin((Math.PI * j) / 12) * 22, y1 = 14 + Math.sin((Math.PI * (j + 1)) / 12) * 22, hz = Math.hypot(bx - ax, bz - az);
-          b.add(G.box, rsMat, (ax + bx) / 2, (y0 + y1) / 2, (az + bz) / 2, 1.6, 1.6, Math.hypot(hz, y1 - y0), -Math.atan2(y1 - y0, hz), ry, 0, hdr('#9ad8ff', 1.5));
-        }
-      }
-      const g = b.build();
-      g.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.renderOrder = -4; } });
-      g.visible = false;
-      return g;
-    })();
-    sky.add(riverSky);
-    let riverK = 0;
 
     const trainStyle = {
       body: '#eef1f5', bodyMetal: true, roof: '#d4d9e0', under: '#2a2f38', stripe: RED, stripe2: '#c9a227', nose: 'bullet',
@@ -594,16 +526,12 @@ export default {
     return {
       track, decor, skyline: sky, trainStyle, barrier,
       zoneAt: (k) => (k < 0 ? 'lake' : ZONES[k % ZONES.length]),
-      zonePool: { lake: [4, 6], avenueL: [2, 3], avenueR: [2, 3], river: [5, 8] },
+      zonePool: { lake: [4, 6], avenueL: [2, 3], avenueR: [2, 3], river: [3, 5], pengbu: [1, 1], gate: [1, 1], lotus: [1, 1], third: [1, 1] },
       coinGeo: coinGeometry('cash'), coinMat: coinMaterial('#ffcf4a', '#ff9a1a'),
       landmarks: ROUTE.map((k) => byKey[k]),
       update(t) {
         water.userData.scroll.offset.set(t * 0.008, t * 0.02); ledScreen.uniforms.time.value = t;
         S.update(t); K.update(t); LM.update(t);
-        // where the camera is on the loop: the river's horizon comes up through the avenue and goes again on the way back
-        const n = ZONES.length, p = ((((-sky.position.z) / CHUNK_LEN) % n) + n) % n;
-        const k = smooth(clamp((p - 6.2) / 1.6, 0, 1)) * (1 - smooth(clamp((p - 18.2) / 1.6, 0, 1)));
-        if (k !== riverK) { riverK = k; rsMat.opacity = k; S.sky.uniforms.fade.value = k; riverSky.visible = k > 0.003; }
       },
     };
   },

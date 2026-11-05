@@ -2,8 +2,9 @@
 // with its shading baked: the Hollywood Sign on Mount Lee, Griffith Observatory on its ridge, the Getty on its hill,
 // City Hall's white tower and stepped pyramid, downtown's towers (the Wilshire Grand's sail and spire, the U.S. Bank
 // Tower's glass crown, the Aon Center's dark slab, the Gas Company's blue crown), Mount Wilson's masts; the premiere
-// searchlights. S is the style: materials (wall, glow, dark, metal, sign) and colours (c...).
-import { THREE, G, rand, pick } from '../core.js';
+// searchlights; the helicopters over the basin. S is the style: materials (wall, glow, dark, metal, sign) and colours (c...).
+import { THREE, Batcher, G, hdr, rand, pick } from '../core.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { frustum4 } from './ny_icons.js';
 import { windowed } from './sf_icons.js';
 
@@ -112,15 +113,42 @@ export function mast(F, S, lamp, { h = 120, foot = 0 } = {}) {   // a TV mast on
 }
 
 // ---------- the searchlights ----------
-// a premiere's searchlight beam: a long thin cone from its foot (narrow) up into the sky, fading as it goes; the
-// caller swings it
-export function searchlight(len = 900, r = 16, k = 0.13) {
+// a premiere's searchlight beam: a long thin cone from its foot (narrow) up into the sky, fading as it goes (to floor
+// of its brightness at the far end); the caller swings it
+export function searchlight(len = 900, r = 16, k = 0.13, floor = 0) {
   const geo = new THREE.ConeGeometry(r, len, 14, 1, true);
   geo.rotateX(Math.PI); geo.translate(0, len / 2, 0);   // the point at the foot, opening upward
   const P = geo.attributes.position, col = new Float32Array(P.count * 3);
-  for (let i = 0; i < P.count; i++) { const f = Math.pow(1 - Math.min(1, P.getY(i) / len), 1.4) * k; col.set([f * 0.92, f * 0.96, f], i * 3); }
+  for (let i = 0; i < P.count; i++) { const f = (floor + (1 - floor) * Math.pow(1 - Math.min(1, P.getY(i) / len), 1.4)) * k; col.set([f * 0.92, f * 0.96, f], i * 3); }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide, forceSinglePass: true }));
   m.frustumCulled = false; m.renderOrder = -2;
   return m;
+}
+
+// ---------- the helicopters ----------
+// A helicopter over the basin, unlit like the rest of the skyline, its front toward -z: the cabin and its glass, the
+// doors (white on the police's black), the boom and fin, the skids; the rotor's blur over it and the tail rotor's beside
+// the fin; the blades (the police's, near enough to see them), which the caller spins; the red beacons, top and bottom (lamp),
+// which the caller blinks.
+export function helicopter({ police = true, lamp }) {
+  const b = new Batcher(), mat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false });
+  const c = police ? '#1c1c24' : '#e4e0ea', c2 = police ? '#e8e8ee' : '#2a5ad8';
+  b.add(G.sph, mat, 0, 0, 0, 2.8, 2.5, 5.4, 0, 0, 0, c);
+  b.add(G.sph, mat, 0, 0.25, -1.5, 2.3, 1.7, 2.6, 0, 0, 0, hdr('#5a6a8a', 0.9));
+  for (const e of [-1, 1]) b.add(G.box, mat, e * 1.3, -0.15, 0.2, 0.06, 1.1, 1.8, 0, 0, 0, c2);
+  b.add(G.box, mat, 0, 0.45, 4.6, 0.45, 0.55, 5.8, 0.06, 0, 0, c); b.add(G.box, mat, 0, 1.4, 7.4, 0.14, 1.9, 1.1, -0.35, 0, 0, c);
+  b.add(G.box, mat, 0, 0.55, 6.8, 2.0, 0.1, 0.5, 0, 0, 0, c2);
+  for (const e of [-1, 1]) { b.add(G.box, mat, e * 1.15, -1.75, 0, 0.12, 0.12, 4.4, 0, 0, 0, '#3a3a40'); for (const f of [-1, 1]) b.add(G.box, mat, e * 0.95, -1.3, f * 1.0, 0.1, 0.9, 0.1, 0, 0, e * 0.4, '#3a3a40'); }
+  b.add(G.cyl8, mat, 0, 1.45, 0, 0.5, 0.6, 0.5, 0, 0, 0, '#2a2a30');
+  b.add(G.sph, lamp, 0, 1.85, 0.5, 0.36, 0.36, 0.36);
+  b.add(G.sph, lamp, 0, -1.35, 0.4, 0.4, 0.4, 0.4);
+  b.add(G.sph, mat, 0, -0.9, -2.0, 0.7, 0.7, 0.7, 0, 0, 0, hdr('#fff4e0', 3.5));   // its nose light
+  const g = b.build();
+  const discs = mergeGeometries([new THREE.CircleGeometry(5.6, 28).rotateX(-Math.PI / 2).translate(0, 1.8, 0), new THREE.CircleGeometry(0.95, 16).rotateY(Math.PI / 2).translate(0.25, 1.4, 7.5)]);   // the rotors' blur
+  const blur = new THREE.Mesh(discs, new THREE.MeshBasicMaterial({ color: '#24242c', transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false, fog: false }));
+  const blades = new THREE.Mesh(new THREE.BoxGeometry(11.2, 0.06, 0.32), mat); blades.position.y = 1.82;
+  g.add(blur); if (police) g.add(blades);
+  g.traverse((o) => { o.frustumCulled = false; o.renderOrder = -2; });
+  return { g, blades };
 }

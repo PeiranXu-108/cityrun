@@ -3,23 +3,29 @@
 // coming on, the premiere searchlights beginning to sweep, the jets' landing lights strung out over the basin. Beverly
 // Hills' villas behind their lawns and hedges, the roadside of the fifties, Hollywood Boulevard's stars and marquees,
 // downtown's towers and picture palaces, the Eastside's murals and lowriders, the beach towns' bungalows and surf
-// shops. Metro trains wait on the line; an old Red Car of the Pacific Electric comes at you, its whistle blowing. Twelve
-// landmarks, two of them on the beach from Venice to Santa Monica, which the run follows (la_beach.js).
-import { THREE, Batcher, VC, G, std, hdr, stripeTex, canvasTex, CHUNK_LEN, TRAIN_W, TRAIN_H, rand, randi, pick, chance } from '../core.js';
+// shops; the freeway jammed in the evening rush, a studio's lot, pumpjacks nodding in their fenced lots (la_streets.js),
+// police helicopters circling. Metro trains wait on the line; an old Red Car of the Pacific Electric comes at you, its
+// whistle blowing. Twenty landmarks, two of them on the beach from Venice to Santa Monica, which the run follows
+// (la_beach.js); the others in la_landmarks.js, la_sights.js and la_hills.js.
+import { THREE, Batcher, VC, G, std, basic, hdr, stripeTex, canvasTex, CHUNK_LEN, TRAIN_W, TRAIN_H, rand, randi, pick, chance, clamp, smooth } from '../core.js';
 import { barrierStyle, coinGeometry, coinMaterial } from '../props.js';
 import { makeTrack, skyline, skyTex, polar, polarXZ, below, farGround } from './common.js';
 import { frame, bakeShade } from './ny_icons.js';
 import { ridge, ridgeHeight } from './taipei_towers.js';
 import { sparkles } from './paris_kit.js';
 import { tower } from './sf_icons.js';
-import { hollywoodSign, griffith, getty, cityHall, wilshireGrand, usBank, aon, gasCo, mast, searchlight } from './la_icons.js';
+import { hollywoodSign, griffith, getty, cityHall, wilshireGrand, usBank, aon, gasCo, mast, searchlight, helicopter } from './la_icons.js';
 import { makeBeach } from './la_beach.js';
+import { makeStreets } from './la_streets.js';
+import { farSeaMat, seaU } from './la_sea.js';
 import { laLandmarks } from './la_landmarks.js';
+import { laSights } from './la_sights.js';
+import { laHills } from './la_hills.js';
 import { beam } from './tokyo_kit.js';
 import { makeKit, X0, SANS, BLADE, STUCCO, PASTEL, STRIP_SIGNS, HOLLY_SIGNS, EAST_SIGNS, BEACH_SIGNS } from './la_kit.js';
 
-const BLURB = '六月的洛杉矶，太阳正沉进左边的太平洋，天从橘红烧到粉紫，一街又一街高高的蒲葵变成黑色剪影；霓虹灯和五六十年代的路边招牌刚刚亮起，好莱坞首映的探照灯开始在天上扫，进近机场的飞机一架接一架亮着着陆灯排在天边。比佛利山庄的西班牙式白墙红瓦别墅藏在草坪和高高的绿篱后面，九重葛从墙角垂下来；公路边是回旋镖屋顶的咖啡店、屋顶顶着巨型甜甜圈的得来速、洗车房和霓虹箭头的汽车旅馆；好莱坞大道的人行道上嵌着星星，剧院遮檐的灯泡在跑；市中心有石砌高楼和老电影宫，东区满墙壁画、西班牙文招牌和液压顶起车头的 lowrider，海边小镇是工匠风小平房和冲浪店。从联合车站和奥维拉街出发，经过迪士尼音乐厅和天使铁路、第六街高架桥、纪念体育场和机场的光柱，然后跑上海滩：穿过威尼斯运河、木栈道和肌肉海滩，从圣莫尼卡码头底下的木桩间钻过去，摩天轮就在头顶亮着；再沿威尔希尔大道经过城市之光，到比佛利山庄、日落大道、好莱坞星光大道和中国剧院，最后上格里菲斯天文台俯瞰整片灯海。天边一直看得到山上的 HOLLYWOOD 白字、天文台和市中心的高楼。';
-const SIGHTS = ['联合车站 · 奥维拉街', '迪士尼音乐厅 · 天使铁路', '第六街高架桥', '洛杉矶纪念体育场', '洛杉矶国际机场', '威尼斯海滩', '圣莫尼卡码头', '城市之光 · 艺术博物馆', '比佛利山庄 · 罗迪欧大道', '日落大道', '星光大道 · 中国剧院', '格里菲斯天文台'];
+const BLURB = '六月的洛杉矶，太阳正沉进左边的太平洋，天从橘红烧到粉紫，一街又一街高高的蒲葵变成黑色剪影；霓虹灯和五六十年代的路边招牌刚刚亮起，好莱坞首映的探照灯开始在天上扫，进近机场的飞机一架接一架亮着着陆灯排在天边，警用直升机在头顶盘旋，探照灯在街上扫来扫去。比佛利山庄的西班牙式白墙红瓦别墅藏在草坪和高高的绿篱后面，九重葛从墙角垂下来；公路边是回旋镖屋顶的咖啡店、屋顶顶着巨型甜甜圈的得来速、洗车房和霓虹箭头的汽车旅馆，围栏里的抽油机一下一下地点头；高速公路上堵满亮着尾灯的车，头顶横过立交桥；好莱坞大道的人行道上嵌着星星，剧院遮檐的灯泡在跑，片场里正在拍西部片；市中心有石砌高楼和老电影宫，东区满墙壁画、西班牙文招牌和液压顶起车头的 lowrider，海边小镇是工匠风小平房和冲浪店。从联合车站和奥维拉街出发，经过迪士尼音乐厅和天使铁路、百老汇的老剧院和东哥伦比亚大楼的青绿钟楼、第六街高架桥和纪念体育场，从瓦茨塔下的车站和机场的光柱旁跑过，然后跑上海滩：穿过威尼斯运河、木栈道和肌肉海滩，从圣莫尼卡码头底下的木桩间钻过去，摩天轮就在头顶亮着；再从盖蒂中心的山脚下经过，沿威尔希尔大道经过城市之光和农夫市场的钟楼，到比佛利山庄、日落大道和悬在山崖上的斯塔尔住宅，经过好莱坞星光大道和中国剧院、好莱坞露天剧场的音乐壳，上格里菲斯天文台俯瞰整片灯海，最后绕过回声公园湖和道奇体育场回到联合车站。天边一直看得到山上的 HOLLYWOOD 白字、天文台和市中心的高楼。';
+const SIGHTS = ['联合车站 · 奥维拉街', '迪士尼音乐厅 · 天使铁路', '百老汇剧院区', '第六街高架桥', '洛杉矶纪念体育场', '瓦茨塔', '洛杉矶国际机场', '威尼斯海滩', '圣莫尼卡码头', '盖蒂中心', '城市之光 · 艺术博物馆', '农夫市场 · The Grove', '比佛利山庄 · 罗迪欧大道', '日落大道', '斯塔尔住宅 · 好莱坞山', '星光大道 · 中国剧院', '好莱坞露天剧场', '格里菲斯天文台', '回声公园湖', '道奇体育场'];
 
 // the skyline's models: unlit, their shading baked; white walls and glass catching the sunset, the hills going violet
 const skyMat = (o = {}) => new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, ...o });
@@ -42,18 +48,25 @@ const isSea = (d) => d > SEA[0] && d < SEA[1];
 const ICONS = [[0, 1300], [9.5, 1240], [30, 1000], [36, 1060], [-21, 1200]];
 const SIGN_R = 1340, SIGN_S = 2.5;
 
-// The loop: twelve landmarks, each heading four chunks (world.js LANDMARK_EVERY), in this order. The beach takes seven
-// chunks in a row (la_beach.js): the Venice canals, Venice Beach (a landmark), the boardwalk, Muscle Beach, the open
-// sand, the Santa Monica Pier (a landmark), the bluffs; the beach towns' streets either side of it.
-const ROUTE = ['union', 'bunker', 'viaduct', 'coliseum', 'lax', 'venice', 'pier', 'urbanLight', 'beverly', 'sunset', 'hollywood', 'griffith'];
+// The loop: twenty landmarks, each heading four chunks (world.js LANDMARK_EVERY), in this order: downtown, south through
+// Watts to LAX and the beach, up the Westside to Hollywood and the hills, and back down through Echo Park and Chavez
+// Ravine to Union Station. The beach takes seven chunks in a row (la_beach.js): the Venice canals, Venice Beach (a
+// landmark), the boardwalk, Muscle Beach, the open sand, the Santa Monica Pier (a landmark), the bluffs; the beach
+// towns' streets either side of it. Everything that depends on where a landmark falls is counted from it (kOf).
+const ROUTE = ['union', 'bunker', 'broadway', 'viaduct', 'coliseum', 'watts', 'lax', 'venice', 'pier', 'getty', 'urbanLight', 'grove', 'beverly', 'sunset', 'stahl', 'hollywood', 'bowl', 'griffith', 'echoPark', 'dodger'];
 const LOOP = ROUTE.length * 4;
-const ZONES = Array.from({ length: LOOP }, (_, k) => ({ 17: 'coast', 18: 'coast', 19: 'canals', 21: 'boardwalk', 22: 'muscle', 23: 'strand', 25: 'palisades', 26: 'coast', 27: 'coast' })[k] || (k < 16 ? 'east' : 'west'));
-// the streets each part of town runs to: downtown, the Eastside and the roadside south of it; the beach towns; Beverly
-// Hills to Hollywood
+const kOf = (key) => ROUTE.indexOf(key) * 4;   // the chunk a landmark heads
+const LIGHTS = ['sunset', 'stahl', 'griffith'].filter((k) => ROUTE.includes(k)).map(kOf);   // the ones looking out over the basin's lights
+// the beach's chunks, counted from Venice's
+const BEACH = { [-3]: 'coast', [-2]: 'coast', [-1]: 'canals', 1: 'boardwalk', 2: 'muscle', 3: 'strand', 5: 'palisades', 6: 'coast', 7: 'coast' };
+const ZONES = Array.from({ length: LOOP }, (_, k) => BEACH[k - kOf('venice')] || (k < kOf('coliseum') || k >= kOf('griffith') + 2 ? 'east' : k < kOf('lax') ? 'south' : 'west'));
+// the streets each part of town runs to: downtown and the Eastside (and Echo Park on the way back to them); South LA, the
+// roadside and the freeways; the beach towns; the Westside, Beverly Hills to Hollywood and the studios
 const KINDS = {
-  east: [['downtown', 0.3], ['eastside', 0.32], ['googie', 0.24], ['palms', 0.14]],
+  east: [['downtown', 0.28], ['eastside', 0.28], ['googie', 0.2], ['palms', 0.12], ['freeway', 0.12]],
+  south: [['freeway', 0.35], ['googie', 0.35], ['eastside', 0.3]],
   coast: [['beachtown', 0.55], ['googie', 0.25], ['palms', 0.2]],
-  west: [['palms', 0.36], ['hollywood', 0.34], ['googie', 0.3]],
+  west: [['palms', 0.3], ['hollywood', 0.28], ['googie', 0.2], ['studio', 0.14], ['freeway', 0.08]],
 };
 
 export default {
@@ -75,6 +88,8 @@ export default {
 
     // ---------- the street kinds ----------
     const clear = (gaps, z, r = 0) => !gaps.some(([a, c]) => z > a - r && z < c + r);
+    let corner = false;   // this chunk starts at a corner: the crossing and its signals (stop signs among the villas); no cars parked on it
+    const cg = () => (corner ? [[-2, 7.5]] : []);
     const palmsSide = (b, s) => {   // Beverly Hills: villas behind their lawns and hedges, the palms in a row down the parkway
       K.kerbLane(b, s, { red: 0.15 });
       K.lawn(b, s * 7.7, -CHUNK_LEN / 2, 1.9, CHUNK_LEN, '#4a7a34', 0.04);   // the parkway between the kerb and the pavement
@@ -93,29 +108,31 @@ export default {
         if (chance(0.5)) K.place(b, (t) => K.car(t, 0, 0, 1, { kind: pick(['suv', 'convertible', 'classic', 'sedan']) }), new THREE.Matrix4().makeRotationY(Math.PI / 2).setPosition(s * 16.6, 0, dz));
         z += L;
       }
-      K.carRow(b, s * 5.25, 0, CHUNK_LEN, { p: 0.35 });
+      K.carRow(b, s * 5.25, 0, CHUNK_LEN, { p: 0.35, gaps: cg() });
       for (let z = rand(6, 12); z < CHUNK_LEN - 2; z += rand(26, 32)) if (clear(trees.map((t) => [t - 1.5, t + 1.5]), z)) K.lamp(b, s * 7.0, -z, s);
       for (let k = randi(1, 3); k > 0; k--) K.person(b, s * rand(9, 10.2), -rand(4, 76), { ry: chance(0.5) ? 0 : Math.PI, top: pick(['#ff5aa0', '#2a6ad8', '#f4f0e8', '#141414']), shorts: true });   // joggers
       if (chance(0.4)) K.dog(b, s * rand(9, 10), -rand(6, 74));
       if (chance(0.25)) K.cart(b, s * 9.4, -rand(10, 70), s, 'STAR MAPS');
       if (chance(0.3)) K.streetSign(b, s * 7.0, -rand(4, 76), s, pick([4, 9, 8, 6]), pick([9, 4]));
     };
-    const googieSide = (b, s, poles) => {   // the roadside: one business after another behind its car park, the pole signs, the palms, the wires
+    const googieSide = (b, s, poles, oil = 1) => {   // the roadside: one business after another behind its car park, the pole signs, the palms, the wires; an oil lot now and then
       K.kerbLane(b, s, { x1: 10.8, red: 0.6 });
       const MAKE = { coffee: [22, 24, K.coffeeShop], donut: [15, 20, K.donutShop], wash: [24, 22, K.carWash], motel: [30, 28, K.motel], gas: [24, 18, K.gasStation], hotdog: [15, 18, K.hotDogStand] };
       for (let z = rand(0, 3); z < CHUNK_LEN - 12;) {
-        const kind = pick(['coffee', 'donut', 'wash', 'motel', 'gas', 'hotdog', 'strip', 'strip']);
-        const len = kind === 'strip' ? Math.min(rand(26, 40), CHUNK_LEN - z) : MAKE[kind][0];
+        const kind = pick(['coffee', 'donut', 'wash', 'motel', 'gas', 'hotdog', 'strip', 'strip', ...Array(oil).fill('oil')]);
+        const len = kind === 'strip' ? Math.min(rand(26, 40), CHUNK_LEN - z) : kind === 'oil' ? Math.min(rand(24, 34), CHUNK_LEN - z) : MAKE[kind][0];
         if (z + len > CHUNK_LEN + 2 || len < 20) break;
         if (kind === 'strip') K.stripMall(b, s, z, z + len);
+        else if (kind === 'oil') K.oilLot(b, s, z, z + len);
         else { const [, xc, fn] = MAKE[kind]; K.carPark(b, s, 10.8, xc - 4, z, z + len, { cars: 0.4 }); fn(b, s, xc, -(z + len / 2)); }
         z += len + rand(1, 3);
       }
       K.powerLine(b, s * 10.4, 0, CHUNK_LEN, poles);
       for (let z = rand(5, 12); z < CHUNK_LEN - 2; z += rand(18, 26)) if (clear(poles.map((p) => [p - 2, p + 2]), z)) K.fanPalm(b, s * 9.6, -z, rand(1.0, 1.2));
       for (let z = rand(10, 16); z < CHUNK_LEN - 2; z += rand(28, 34)) K.lamp(b, s * 7.0, -z, s);
-      K.carRow(b, s * 5.25, 0, CHUNK_LEN, { p: 0.5, lit: true });
+      K.carRow(b, s * 5.25, 0, CHUNK_LEN, { p: 0.5, lit: true, gaps: cg() });
       if (chance(0.6)) K.busStop(b, s * 8.0, -rand(10, 70), s);
+      K.streetBits(b, s, 8, CHUNK_LEN, { gaps: poles.map((p) => [p - 1, p + 1]) });
       if (chance(0.5)) K.parkingSigns(b, s * 7.1, -rand(4, 76));
       if (chance(0.5)) K.hydrant(b, s * 7.1, -rand(6, 74));
       if (chance(0.3)) K.mailbox(b, s * 7.3, -rand(6, 74));
@@ -134,7 +151,8 @@ export default {
       for (let k = randi(1, 3); k > 0; k--) K.person(b, s * rand(7.4, 8.4), -rand(6, 74), { costume: pick(['cowboy', 'pirate', 'robot', 'showgirl']), ry: s < 0 ? -Math.PI / 2 : Math.PI / 2 });
       if (chance(0.5)) K.cart(b, s * 8.6, -rand(10, 70), s, pick(['HOT DOGS', 'STAR MAPS', 'CHURROS']));
       if (chance(0.5)) K.tourVan(b, s * 5.2, -rand(12, 68), pick([-1, 1]));
-      else K.carRow(b, s * 5.25, 0, CHUNK_LEN, { p: 0.5, lit: true });
+      else K.carRow(b, s * 5.25, 0, CHUNK_LEN, { p: 0.5, lit: true, gaps: cg() });
+      K.streetBits(b, s, 8, CHUNK_LEN, { meters: true, gaps: palms.map((p) => [p - 1, p + 1]) });
       if (chance(0.4)) K.billboard(b, s * rand(23, 27), -rand(16, 64), s, { y: rand(10, 13), ry: -s * 0.5 });
       if (chance(0.4)) K.streetSign(b, s * 7.1, -rand(4, 76), s, pick([2, 3, 29]), 0);
     };
@@ -146,7 +164,8 @@ export default {
       for (let k = randi(1, 2); k > 0; k--) { const z = rand(8, 72); if (clear(taken.map((t) => [t - 4, t + 4]), z)) { K.cart(b, s * 9.2, -z, s, pick(['MANGOS', 'HOT DOGS', 'FRUTA', 'ELOTES', 'TAMALES'])); taken.push(z); } }
       for (let z = rand(5, 10); z < CHUNK_LEN - 2; z += rand(20, 24)) if (clear(taken.map((t) => [t - 3, t + 3]), z)) K.lamp(b, s * 7.3, -z, s, { kind: 'twin' });
       const r = Math.random();
-      if (r < 0.45) K.tacoTruck(b, s * 5.2, -rand(12, 66), s); else if (r < 0.7) K.metroBus(b, s * 5.3, -rand(14, 66), s); else K.carRow(b, s * 5.25, 0, CHUNK_LEN, { p: 0.45 });
+      if (r < 0.45) K.tacoTruck(b, s * 5.2, -rand(12, 66), s); else if (r < 0.7) K.metroBus(b, s * 5.3, -rand(14, 66), s); else K.carRow(b, s * 5.25, 0, CHUNK_LEN, { p: 0.45, gaps: cg() });
+      K.streetBits(b, s, 8, CHUNK_LEN, { meters: true, gaps: taken.map((t) => [t - 2, t + 2]) });
       K.throng(b, s * 7.8, s * 12, 2, CHUNK_LEN - 2, randi(12, 18), taken.map((t) => [t - 2, t + 2]));
       if (chance(0.4)) K.parkingSigns(b, s * 7.1, -rand(4, 76));
       if (chance(0.3)) K.streetSign(b, s * 7.1, -rand(4, 76), s, pick([10, 11, 12, 13]), pick([10, 11]));
@@ -159,7 +178,8 @@ export default {
         else K.shop(b, s, X0, -(z + w / 2), w, { style: pick(['stucco', 'mission', 'mission']), floors: randi(1, 2), col: pick([...STUCCO, '#f2c230', '#39b8a8', '#e8708a', '#ff9a4a', '#8ad8f0', '#b8e0a0']), sign: pick(EAST_SIGNS) });
         z += w + rand(0.02, 0.2);
       }
-      K.carRow(b, s * 5.25, 0, CHUNK_LEN, { p: 0.6, kinds: [K.lowrider, K.lowrider, K.car, K.car] });
+      K.carRow(b, s * 5.25, 0, CHUNK_LEN, { p: 0.6, kinds: [K.lowrider, K.lowrider, K.car, K.car], gaps: cg() });
+      K.streetBits(b, s, 8, CHUNK_LEN, { news: false, gaps: poles.map((p) => [p - 1, p + 1]) });
       const taken = [];
       for (let k = randi(1, 2); k > 0; k--) { const z = rand(8, 72); if (clear(taken.map((t) => [t - 4, t + 4]), z)) { K.cart(b, s * 8.4, -z, s); taken.push(z); } }
       if (chance(0.35)) { const z = rand(10, 70); if (clear(taken.map((t) => [t - 4, t + 4]), z)) { K.mariachi(b, s * 9.4, -z, s); taken.push(z); } }
@@ -194,7 +214,8 @@ export default {
       for (let z = rand(4, 9); z < CHUNK_LEN - 2; z += rand(14, 18)) if (clear(poles.map((p) => [p - 2, p + 2]), z)) K.fanPalm(b, s * 7.6, -z, rand(0.95, 1.15));   // (the date palms' fronds would reach over the track here)
       for (let z = rand(10, 16); z < CHUNK_LEN - 2; z += rand(26, 32)) K.lamp(b, s * 7.0, -z, s);
       K.powerLine(b, s * 10.4, 0, CHUNK_LEN, poles);
-      K.carRow(b, s * 5.25, 0, CHUNK_LEN, { p: 0.55 });
+      K.carRow(b, s * 5.25, 0, CHUNK_LEN, { p: 0.55, gaps: cg() });
+      K.streetBits(b, s, 8, CHUNK_LEN, { news: chance(0.3), gaps: poles.map((p) => [p - 1, p + 1]) });
       for (let k = randi(2, 4); k > 0; k--) K.person(b, s * rand(7.6, 10.4), -rand(4, 76), { surf: chance(0.6), shorts: true, ry: chance(0.5) ? 0 : Math.PI });
       if (chance(0.6)) K.skater(b, s * rand(8, 10), -rand(6, 74));
       for (let k = randi(1, 3); k > 0; k--) K.bike(b, s * 10.9, -rand(6, 74), 0);
@@ -204,11 +225,13 @@ export default {
       const b = new Batcher(), W = KINDS[zone] || KINDS.east;
       let r = Math.random(), kind = W[W.length - 1][0];
       for (const [k, w] of W) { if (r < w) { kind = k; break; } r -= w; }
+      if (kind === 'freeway' || kind === 'studio') { ST[kind](b, zone); const g = K.flush(b.build()); g.userData.kind = kind; return g; }   // (la_streets.js: no corners, no wires)
       const poles = []; for (let z = rand(4, 16); z < CHUNK_LEN; z += rand(32, 40)) poles.push(z);
+      corner = chance(kind === 'palms' ? 0.35 : 0.45);
       for (const s of [-1, 1]) {
         farGround(b, s, kind === 'palms' ? '#5a6a40' : '#8a7a62');
         if (kind === 'palms') palmsSide(b, s);
-        else if (kind === 'googie') googieSide(b, s, poles);
+        else if (kind === 'googie') googieSide(b, s, poles, zone === 'south' ? 3 : 1);
         else if (kind === 'hollywood') hollywoodSide(b, s);
         else if (kind === 'downtown') downtownSide(b, s);
         else if (kind === 'eastside') eastSide(b, s, poles);
@@ -219,15 +242,20 @@ export default {
         K.papel(b, -7.25, 7.25, 13.2, -z, { sag: 0.9 });
       }
       if ((kind === 'googie' || kind === 'eastside' || kind === 'beachtown') && chance(0.6)) K.span(b, pick(poles), 10.4);   // wires across, high over the track
-      const g = K.flushSmoke(b.build());
+      if (zone === 'coast') B.coastSea(b);   // the sea behind the beach towns, beyond their back lots
+      if (corner) {
+        if (kind === 'palms') for (const s of [-1, 1]) K.stopSign(b, s * 7.2, -1.0);
+        else { K.crosswalk(b, 3); for (const s of [-1, 1]) K.signal(b, s * 7.25, -0.8, s); }
+      }
+      const g = K.flush(b.build());
       g.userData.kind = kind;
       return g;
     };
 
-    const B = makeBeach(K);
+    const B = makeBeach(K), ST = makeStreets(K);
     const decor = (zone) => (B.zones[zone] ? B.zones[zone]() : cityDecor(zone));
-    const LM = laLandmarks(K);
-    const byKey = { ...B.landmarks, ...LM.landmarks };
+    const LM = laLandmarks(K), SI = laSights(K, LM), HI = laHills(K, { cityLights: LM.cityLights, slope: LM.slope, palmRow: LM.palmRow, carriageway: ST.carriageway });
+    const byKey = { ...B.landmarks, ...LM.landmarks, ...SI.landmarks, ...HI.landmarks };
 
     // ---------- the horizon ----------
     // The Hollywood Hills straight ahead, the white letters on Mount Lee, Griffith Observatory on its ridge to the right
@@ -252,10 +280,6 @@ export default {
           const r = 1240, y = (ridgeHeight(9.5, LA_PEAKS) - 100) * (r / 1400) - 14;
           griffith(frame(b, ...polarXZ(9.5, r, y), 1.5, polar(9.5, r)[2]), SKY, { foot: 30 });
         },
-        (b) => {   // the Getty on its hilltop
-          const r = 1200, y = (ridgeHeight(-21, LA_PEAKS) - 100) * (r / 1400) - 10;
-          getty(frame(b, ...polarXZ(-21, r, y), 1.0, polar(-21, r)[2] + 0.4), SKY, { foot: 30 });
-        },
         (b, mat) => {   // downtown: City Hall in front, the Wilshire Grand, the U.S. Bank Tower, the Aon Center, the Gas Company, the rest
           cityHall(frame(b, ...polarXZ(28.5, 900, 0), 0.5, polar(28.5, 900)[2]), SKY, { foot: below(0, 0.5, 900) });
           wilshireGrand(frame(b, ...polarXZ(33, 1060, 0), 0.4, polar(33, 1060)[2] + 0.3), SKY, mat, { foot: below(0, 0.4, 1060) });
@@ -274,39 +298,73 @@ export default {
       ],
     });
     bakeShade(sky, [SKY.wall, SKY.dark, SKY.metal, SKY.sign], new THREE.Vector3(-0.8, 0.3, 0.5), 0.62, 0.5);
-    // The sea under the horizon on the left: a shallow cone from 520 m out (low, to meet the water of the beach) rising to
-    // the horizon, violet near and peach far, a road of light down it toward the sun; solid, drawn after the skyline's
+    // the Getty on its hilltop: a group of its own, its materials its own, so that it can fade away while the real one is
+    // near (la_hills.js)
+    const GW = skyMat({ transparent: true }), GS = { ...SKY, wall: GW, glow: GW };   // (one material, so it is one draw)
+    const gettyFar = (() => {
+      const b = new Batcher(), r = 1200, y = (ridgeHeight(-21, LA_PEAKS) - 100) * (r / 1400) - 10;
+      getty(frame(b, ...polarXZ(-21, r, y), 1.0, polar(-21, r)[2] + 0.4), GS, { foot: 30 });
+      const g = b.build(); g.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.renderOrder = -5; } });
+      bakeShade(g, [GS.wall], new THREE.Vector3(-0.8, 0.3, 0.5), 0.62, 0.5);
+      return g;
+    })();
+    sky.add(gettyFar);
+    let gettyK = -1;
+    // The sea under the horizon on the left (la_sea.js): rings from 330 m out, low enough to lie under the curved world's
+    // own horizon wherever that falls (from the jetpack too), rising to the horizon at 1500 m. Its colour comes from the
+    // direction you look in, as the near water's does, so the beach's sea runs on into it without a seam; it reaches round
+    // under the coast's houses at the front, so they stand along the shore of the bay. Solid, drawn after the skyline's
     // models so it hides their feet, never in front of the near world.
-    const SUN_DEG = (Math.atan2(-0.6, 1) * 180) / Math.PI;
+    // Inland, clear of the basin's lights seen from the hills (Sunset, Griffith), it keeps to its old shallow cone from 520 m
+    // out (coastF 0); along the coast it reaches in under the near world's horizon (1): setCoast() moves its rings between the two.
+    const SUN_A = Math.atan2(-0.6, 1), RINGS = [330, 380, 440, 520, 620, 740, 880, 1040, 1220, 1500];
+    const ringY = (rr) => 2 - 80 * Math.pow((1500 - rr) / 1170, 1.6), oldY = (rr) => (rr <= 520 ? -26 : -26 + 28 * Math.pow((rr - 520) / 980, 1.5));
+    const ringAt = (rr, f) => [rr < 520 ? 520 + (rr - 520) * f : rr, oldY(rr) + (ringY(rr) - oldY(rr)) * f];
     const sea = (() => {
-      const pos = [], col = [], idx = [], near = new THREE.Color('#5a4a7a'), far = new THREE.Color('#f0a890'), gold = new THREE.Color('#ffd090'), R = [520, 700, 900, 1150, 1500];
-      const D = []; for (let d = SEA[0]; d <= SEA[1]; d += 1.5) D.push(Math.min(d, SEA[1]));
-      for (const d of D) for (const rr of R) {
-        const [x, z] = polar(d, rr), f = (rr - 520) / 980; pos.push(x, -26 + 28 * Math.pow(f, 1.5), z);   // rising to the eye's height at its far edge, so the sun sinks into it
-        const c = near.clone().lerp(far, Math.pow(f, 0.7)), g = Math.exp(-(((d - SUN_DEG) / 3.2) ** 2));
-        c.lerp(gold, g * (0.35 + 0.6 * f)); col.push(c.r, c.g, c.b);
-      }
-      for (let i = 0; i < D.length - 1; i++) for (let j = 0; j < R.length - 1; j++) { const a0 = i * R.length + j, a1 = a0 + 1, b0 = a0 + R.length, b1 = b0 + 1; idx.push(a0, b0, a1, a1, b0, b1); }
-      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx);
-      const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false, side: THREE.DoubleSide }));
-      m.renderOrder = -4.5; m.frustumCulled = false; return m;
+      const pos = [], idx = [], D = [];
+      for (let d = -114; d <= -15; d += 1.5) D.push(d);
+      for (const d of D) for (const rr of RINGS) { const [x, z] = polar(d, rr); pos.push(x, ringY(rr), z); }
+      for (let i = 0; i < D.length - 1; i++) for (let j = 0; j < RINGS.length - 1; j++) { const a0 = i * RINGS.length + j, a1 = a0 + 1, b0 = a0 + RINGS.length, b1 = b0 + 1; idx.push(a0, b0, a1, a1, b0, b1); }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
+      const m = new THREE.Mesh(g, farSeaMat());
+      m.renderOrder = -4.5; m.frustumCulled = false; m.userData.D = D; return m;
     })();
     sky.add(sea);
+    const SUN_DEG = (SUN_A * 180) / Math.PI;
     const glitter = (() => {   // the sun's road on the water: points of light twinkling along it
       const pts = [];
-      for (let k = 0; k < 160; k++) { const rr = rand(560, 1480), d = SUN_DEG + rand(-1, 1) * (1.2 + (rr - 520) / 600), [x, z] = polar(d, rr); pts.push(x, -26 + 28 * Math.pow((rr - 520) / 980, 1.5) + 0.6, z); }
-      const m = sparkles(pts, { size: 3.0, curved: false }); m.material.uniforms.on.value = 1; m.renderOrder = -4; m.frustumCulled = false; return m;
+      const R = [];
+      for (let k = 0; k < 130; k++) { const rr = rand(560, 1480), d = SUN_DEG + rand(-1, 1) * (1.2 + (rr - 520) / 600), [x, z] = polar(d, rr); pts.push(x, ringY(rr) + 0.6, z); R.push(rr); }
+      const m = sparkles(pts, { size: 3.0, curved: false }); m.material.uniforms.on.value = 1; m.renderOrder = -4; m.frustumCulled = false; m.userData.R = R; return m;
     })();
     sky.add(glitter);
     // the haze lying along the horizon all round: thick under the eye, thinning to nothing just above it
     const haze = (() => {
       const g = new THREE.CylinderGeometry(500, 500, 150, 72, 6, true), P = g.attributes.position, C = new Float32Array(P.count * 4), c = new THREE.Color('#f2b098');
-      for (let i = 0; i < P.count; i++) { const y = P.getY(i) - 70, f = Math.min(1, Math.max(0, (5 - y) / 40)); C.set([c.r, c.g, c.b, Math.pow(f, 0.9) * 0.85], i * 4); P.setY(i, y); }
+      const A0 = new Float32Array(P.count), MASK = new Float32Array(P.count);
+      for (let i = 0; i < P.count; i++) {   // (along the coast none over the open sea: the water does its own, la_sea.js seaHaze)
+        const y = P.getY(i) - 70, f = Math.min(1, Math.max(0, (5 - y) / 40)), d = (Math.atan2(P.getX(i), -P.getZ(i)) * 180) / Math.PI;
+        MASK[i] = smooth(clamp((d + 118) / 10, 0, 1)) * (1 - smooth(clamp((d + 27) / 10, 0, 1)));
+        A0[i] = Math.pow(f, 0.9) * 0.85; C.set([c.r, c.g, c.b, A0[i]], i * 4); P.setY(i, y);
+      }
       g.setAttribute('color', new THREE.BufferAttribute(C, 4));
       const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, fog: false, depthWrite: false, side: THREE.BackSide }));
-      m.renderOrder = -4; m.frustumCulled = false; return m;
+      m.renderOrder = -4; m.frustumCulled = false; m.userData = { A0, MASK }; return m;
     })();
     sky.add(haze);
+    let coastF = -1, hazeF = -1;
+    const setCoast = (f, h) => {   // h: how far the haze is lifted off the sea's bearings (also over the basin's lights from the hills)
+      coastF = f; hazeF = h;
+      const P = sea.geometry.attributes.position, D = sea.userData.D;
+      D.forEach((d, i) => RINGS.forEach((rr, k) => { const [r1, y1] = ringAt(rr, f), [x, z] = polar(d, r1); P.setXYZ(i * RINGS.length + k, x, y1, z); }));
+      P.needsUpdate = true;
+      const H = haze.geometry.attributes.color, { A0, MASK } = haze.userData;
+      for (let i = 0; i < A0.length; i++) H.setW(i, A0[i] * (1 - MASK[i] * h));
+      H.needsUpdate = true;
+      const G2 = glitter.geometry.attributes.position;
+      glitter.userData.R.forEach((rr, i) => G2.setY(i, ringAt(rr, f)[1] + 0.6));
+      G2.needsUpdate = true;
+    };
     // palms standing up black against the sky over the roofs all round the basin (not out on the sea)
     const palmCards = (() => {
       const tex = canvasTex(64, 256, (g, w, h) => {
@@ -334,6 +392,13 @@ export default {
       [new THREE.SphereGeometry(7, 10, 8), new THREE.MeshBasicMaterial({ color: hdr('#fff0d8', 0.35), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })],
       [new THREE.SphereGeometry(1.2, 6, 4).translate(0, 3, -6), LAMP],
     ].map(([g, m]) => { const im = new THREE.InstancedMesh(g, m, NJ); im.frustumCulled = false; im.renderOrder = -2; sky.add(im); return im; });
+    // the helicopters: the police's circling the runner, its searchlight playing over the street ahead and lighting a pool
+    // on it (bent with the world, so it lies on the road); a news crew's hanging far out over the basin
+    const UP = new THREE.Vector3(0, 1, 0), _hv = new THREE.Vector3();
+    const helis = [true, false].map((police) => { const h = helicopter({ police, lamp: LAMP }); h.g.rotation.order = 'YXZ'; sky.add(h.g); return h; });
+    const heliBeam = searchlight(1, 0.06, 0.24, 0.45); sky.add(heliBeam);
+    const heliSpot = new THREE.Mesh(new THREE.CircleGeometry(1, 28).rotateX(-Math.PI / 2), basic({ map: K.poolMat.map, color: hdr('#f4f8ff', 0.7), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -4 }));
+    heliSpot.frustumCulled = false; heliSpot.renderOrder = 1; sky.add(heliSpot);
     const _jm = new THREE.Matrix4(), _jp = new THREE.Vector3(), _js = new THREE.Vector3();
 
     // ---------- the trains ----------
@@ -410,11 +475,34 @@ export default {
       track, decor, skyline: sky, trainStyle, barrier,
       landmarks: ROUTE.map((k) => byKey[k]),
       zoneAt: (k) => (k < 0 ? 'east' : ZONES[k % LOOP]),
-      zonePool: { east: [5, 8], coast: [3, 4], west: [5, 8], canals: [1, 1], boardwalk: [1, 1], muscle: [1, 1], strand: [1, 1], palisades: [1, 1] },
+      zonePool: { east: [5, 8], south: [3, 5], coast: [3, 4], west: [6, 9], canals: [1, 1], boardwalk: [1, 1], muscle: [1, 1], strand: [1, 1], palisades: [1, 1] },
       coinGeo: coinGeometry('star'), coinMat: coinMaterial('#ffc87a', '#ff6a5a'),
       update(t) {
-        K.update(t); B.update(t); LM.update(t, sky.position.z);
+        K.update(t); B.update(t); LM.update(t, sky.position.z); SI.update(t); HI.update(t);
+        seaU.uTime.value = t; seaU.uSunAz.value = SUN_A - sky.rotation.y;
+        // the coast's sea from a little before LAX to just past Urban Light; the haze lifted off the basin's lights too
+        const p = ((((-sky.position.z) / CHUNK_LEN) % LOOP) + LOOP) % LOOP, f = smooth(clamp((p - kOf('lax') + 2.5) / 2, 0, 1)) * (1 - smooth(clamp((p - kOf('urbanLight') - 0.5) / 2, 0, 1)));
+        const bump = (k) => smooth(clamp((p - k + 2.5) / 1.2, 0, 1)) * (1 - smooth(clamp((p - k - 1.3) / 1.2, 0, 1)));
+        const h = Math.max(f, ...LIGHTS.map(bump));
+        if (Math.abs(f - coastF) > 0.004 || Math.abs(h - hazeF) > 0.004 || (f !== coastF && (f === 0 || f === 1)) || (h !== hazeF && (h === 0 || h === 1))) setCoast(f, h);
+        if (ROUTE.includes('getty')) {   // the far Getty fades while the real one is near
+          const kg = kOf('getty'), op = 1 - smooth(clamp((p - kg + 3) / 1.5, 0, 1)) * (1 - smooth(clamp((p - kg - 1.5) / 1.5, 0, 1)));
+          if (Math.abs(op - gettyK) > 0.004 || (op !== gettyK && (op === 0 || op === 1))) { gettyK = op; GW.opacity = op; gettyFar.visible = op > 0.01; }
+        }
         LAMP.color.set('#ff2a1a').multiplyScalar(Math.sin(t * 2.4) > 0.1 ? 3.2 : 0.35);
+        {
+          const [hp, hn] = helis, a = t * 0.045, vx = 210 * Math.cos(a), vz = -120 * Math.sin(a);
+          hp.g.position.set(Math.sin(a) * 210, 62 + 5 * Math.sin(t * 0.37), -240 + Math.cos(a) * 110);
+          hp.g.rotation.set(0.06, Math.atan2(-vx, -vz), 0.14);
+          hn.g.position.set(250 + 20 * Math.sin(t * 0.1), 118 + 4 * Math.sin(t * 0.5), -520 + 30 * Math.cos(t * 0.08));
+          hn.g.rotation.set(0.04, 2.5 + 0.35 * Math.sin(t * 0.07), 0);
+          hp.blades.rotation.y = t * 13;
+          const tx = 7 * Math.sin(t * 0.31), tz = -105 + 26 * Math.sin(t * 0.17), ty = -0.0007 * (tx * tx + tz * tz);   // (where the world's curve has the road by then)
+          _hv.set(tx - hp.g.position.x, ty - hp.g.position.y, tz - hp.g.position.z);
+          const len = _hv.length();
+          heliBeam.position.copy(hp.g.position); heliBeam.quaternion.setFromUnitVectors(UP, _hv.divideScalar(len)); heliBeam.scale.setScalar(len);
+          heliSpot.position.set(tx, 0.4, tz); heliSpot.scale.setScalar(5.5 + 0.8 * Math.sin(t * 1.3));   // (over the ballast)
+        }
         glitter.material.uniforms.time.value = t;
         for (const m of beams) m.rotation.set(0.22 + 0.1 * Math.sin(t * 0.21 + m.userData.ph), 0, 0.42 * Math.sin(t * 0.33 + m.userData.ph));   // leaning out over the city toward you, swinging
         for (let k = 0; k < NJ; k++) { const f = (t / 80 + k / NJ) % 1; _jm.compose(_jp.lerpVectors(J0, J1, f), jq, _js.setScalar(f < 0.94 ? 1 : 0.0001)); for (const im of jets) im.setMatrixAt(k, _jm); }

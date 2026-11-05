@@ -3,29 +3,42 @@
 // Transamerica Pyramid, Salesforce Tower and its neighbours, Coit Tower, Alcatraz and its lighthouse, the Bay Bridge,
 // the Ferry Building's clock tower. S is the style: materials (paint, wall, glass, glow, dark, metal) and colours (c...).
 import { THREE, G, canvasTex, rand, randi, pick } from '../core.js';
-import { taperGeo, frustum4 } from './ny_icons.js';
+import { taperGeo, frustum4, frame, figure } from './ny_icons.js';
 
 // ---------- the Golden Gate ----------
 // One tower in its own units: the roadway at y = 0, the bridge running along z, the legs either side of the deck at
-// x = ±legX. Half the real height (the roadway to the top of the saddles), the portals' stepped struts, the legs'
-// flutes and setbacks; under the deck a strut and the cross-bracing down into the water (foot: how far the legs go on).
+// x = ±legX. Half the real height (the roadway to the top of the saddles). The legs set back at each portal, a pair of
+// flutes running up every face; the portals' struts faced with a row of upright chevrons, stepped down into the legs
+// under them in four corbels; the crown's two struts, the saddles' round-backed housings the cables ride over; under
+// the deck a strut and the cross-bracing down into the water (foot: how far the legs go on).
 export const GG = { legX: 12.4, top: 80, saddle: 81.2, struts: [[22.5, 25.5], [38, 40.6], [52.6, 55], [65.4, 67.6]] };
 export function ggTower(F, S, { foot = 70, lamp = null } = {}) {
   const X = GG.legX, sec = [[-foot, 22.5, 3.7, 5.8], [22.5, 38, 3.4, 5.4], [38, 52.6, 3.1, 5.0], [52.6, 65.4, 2.9, 4.6], [65.4, GG.top, 2.7, 4.3]];
   for (const e of [-1, 1]) for (const [y0, y1, w, d] of sec) {
+    const ya = Math.max(y0, -12);
     F.box(S.paint, S.cOrange, e * X, (y0 + y1) / 2, 0, w, y1 - y0, d);
-    for (const f of [-1, 1]) for (const r of [-0.27, 0.27]) F.box(S.paint, S.cOrange2, e * X + r * w, (Math.max(y0, -12) + y1) / 2, f * (d / 2 + 0.07), w * 0.17, y1 - Math.max(y0, -12), 0.16);   // the flutes
+    for (const r of [-0.27, 0.27]) for (const f of [-1, 1]) {   // the flutes, on all four faces
+      F.box(S.paint, S.cOrange2, e * X + r * w, (ya + y1) / 2, f * (d / 2 + 0.07), w * 0.17, y1 - ya, 0.16);
+      F.box(S.paint, S.cOrange2, e * X + f * (w / 2 + 0.07), (ya + y1) / 2, r * d, 0.16, y1 - ya, d * 0.12);
+    }
     F.box(S.paint, S.cOrange2, e * X, y1 - 0.35, 0, w + 0.36, 0.7, d + 0.36);   // the setback ledge
   }
-  for (const [y0, y1] of GG.struts) {   // the portals: a strut between the legs, stepped in under it at the corners
-    F.box(S.paint, S.cOrange, 0, (y0 + y1) / 2, 0, 2 * X - 2.6, y1 - y0, 3.8);
+  const strut = (y0, y1, dz = 3.8) => {   // a strut between the legs, the chevrons up its faces
+    const L = 2 * X - 2.6, n = Math.round(L / 1.5);
+    F.box(S.paint, S.cOrange, 0, (y0 + y1) / 2, 0, L, y1 - y0, dz);
+    for (let k = 0; k < n; k++) for (const f of [-1, 1]) F.box(S.paint, S.cOrange2, -L / 2 + (k + 0.5) * (L / n), (y0 + y1) / 2 + 0.1, f * dz / 2, 0.75, y1 - y0 - 0.2, 0.75, Math.PI / 4);
+  };
+  for (const [y0, y1] of GG.struts) {   // the portals: each strut stepped down into the legs under it
+    strut(y0, y1);
     F.box(S.paint, S.cOrange2, 0, y0 - 0.45, 0, 2 * X - 7, 0.9, 3.4);
-    for (const e of [-1, 1]) { F.box(S.paint, S.cOrange, e * (X - 2.9), y0 - 1.0, 0, 1.8, 2.0, 3.6); F.box(S.paint, S.cOrange2, e * (X - 4.2), y0 - 0.45, 0, 1.0, 0.9, 3.5); }
+    for (const e of [-1, 1]) for (let k = 0; k < 4; k++) F.box(S.paint, k % 2 ? S.cOrange2 : S.cOrange, e * (X - 2.1 - k * 0.75), y0 - (2.6 - k * 0.6) / 2, 0, 0.75, 2.6 - k * 0.6, 3.6 - k * 0.1);
   }
-  F.box(S.paint, S.cOrange, 0, GG.top - 1.4, 0, 2 * X + 2.2, 2.8, 4.6);   // the crown
+  strut(GG.top - 2.8, GG.top, 4.6); strut(GG.top - 6.4, GG.top - 4.6, 4.2);   // the crown's two struts
+  F.box(S.paint, S.cOrange2, 0, GG.top - 3.7, 0, 2 * X - 4, 1.8, 3.6);
   for (const e of [-1, 1]) {
-    F.box(S.paint, S.cOrange2, e * X, GG.saddle - 0.4, 0, 3.0, 2.2, 5.6);   // the saddle's housing the cable rides over
-    if (lamp) F.box(lamp.mat, lamp.col, e * X, GG.saddle + 1.1, 0, 0.9, 0.9, 0.9);   // the aircraft lamp
+    F.box(S.paint, S.cOrange2, e * X, GG.saddle - 0.6, 0, 3.0, 1.8, 5.6);   // the saddle's housing, its round back, the aircraft lamp on it
+    F.add(G.cyl, S.paint, e * X, GG.saddle + 0.3, 0, 3.0, 5.6, 1.6, Math.PI / 2, 0, 0, S.cOrange2);
+    if (lamp) F.box(lamp.mat, lamp.col, e * X, GG.saddle + 1.4, 0, 0.9, 0.9, 0.9);
   }
   F.box(S.paint, S.cOrange, 0, -6.5, 0, 2 * X - 2.6, 2.6, 3.8);   // under the deck: a strut, the X bracing
   for (const e of [-1, 1]) F.beam(S.paint, S.cOrange, [-e * (X - 1.6), -8, 0], [e * (X - 1.6), -Math.min(foot, 40), 0], 1.5, 1.5);
@@ -141,19 +154,41 @@ export function bayBridge(F, S, { L = 900, towers = [0.12, 0.36, 0.64, 0.88], H 
 }
 
 // ---------- the Ferry Building's clock tower ----------
-// Square, of pale stone, its arched openings, the four clock faces, the stages narrowing to the lantern and its flagpole.
+// After the photographs, its foot on the hall's roof at y = 0: the square shaft, pilaster strips up its corners and a line
+// of little windows up each face; the clock high on every face in its frame; the attic's square windows, the cornice;
+// the open belfry, piers at its corners and two columns a face, the balustrade along its foot; the stepped stage and its
+// urns; the smaller open stage; the round lantern of columns, its dome and ball; the flagpole.
 export function ferryTower(F, S, { clock = null, foot = 0 } = {}) {
-  F.box(S.wall, S.cStone, 0, (34 - foot) / 2, 0, 11, 34 + foot, 11);
-  for (const [y, h] of [[12, 8], [24, 7]]) for (let k = 0; k < 4; k++) { const a = (k * Math.PI) / 2, c = Math.cos(a), s = Math.sin(a); for (const o of [-2.6, 0, 2.6]) F.box(S.glow, S.cArch, c * 5.55 - s * o, y, s * 5.55 + c * o, 0.2 + Math.abs(s) * 1.4, h, 0.2 + Math.abs(c) * 1.4); }
-  F.box(S.wall, S.cStone2, 0, 34.5, 0, 12.2, 1.2, 12.2);
-  F.box(S.wall, S.cStone, 0, 40, 0, 9.4, 10, 9.4);
-  for (let k = 0; k < 4; k++) { const a = (k * Math.PI) / 2; F.add(G.cyl, clock ? clock.mat : S.glow, Math.sin(a) * 4.75, 40.4, Math.cos(a) * 4.75, 6.4, 0.2, 6.4, Math.PI / 2, a, 0, clock ? 0xffffff : S.cClock); }
-  F.box(S.wall, S.cStone2, 0, 45.4, 0, 10.4, 0.9, 10.4);
-  F.box(S.wall, S.cStone, 0, 49, 0, 7.6, 6.4, 7.6);
-  for (let k = 0; k < 4; k++) { const a = (k * Math.PI) / 2; F.box(S.glow, S.cArch, Math.sin(a) * 3.85, 49, Math.cos(a) * 3.85, 0.2 + Math.abs(Math.cos(a)) * 2.6, 4.4, 0.2 + Math.abs(Math.sin(a)) * 2.6); }
-  F.add(G.cyl8, S.wall, 0, 54.8, 0, 6.4, 5, 6.4, 0, Math.PI / 8, 0, S.cStone);
-  F.add(G.cone8, S.wall, 0, 59.4, 0, 6.6, 4.4, 6.6, 0, Math.PI / 8, 0, S.cStone2);
-  F.cyl(S.metal, S.cDark, 0, 66, 0, 0.12, 9, 'cyl6');
+  const W = 11, wall = S.wall, st = S.cStone, st2 = S.cStone2, dark = '#2a2622';
+  const face = (k, o, y, d) => { const a = (k * Math.PI) / 2; return [Math.sin(a) * d + Math.cos(a) * o, y, Math.cos(a) * d - Math.sin(a) * o]; };
+  F.box(wall, st, 0, (27 - foot) / 2, 0, W, 27 + foot, W);
+  for (let k = 0; k < 4; k++) {
+    const a = (k * Math.PI) / 2;
+    for (const o of [-W / 2 + 0.95, W / 2 - 0.95]) F.box(wall, st2, ...face(k, o, 13.5, W / 2 + 0.06), 0.5, 26.4, 0.12, a);   // the pilaster strips
+    for (const y of [5, 8.5, 12, 15.5]) F.box(S.glow, S.cArch, ...face(k, 0, y, W / 2 + 0.03), 0.7, 1.4, 0.06, a);   // the little windows
+    F.add(G.cyl, wall, ...face(k, 0, 20.4, W / 2 + 0.08), 7.6, 0.16, 7.6, Math.PI / 2, a, 0, st2);   // the clock in its frame
+    F.add(G.cyl, clock ? clock.mat : S.glow, ...face(k, 0, 20.4, W / 2 + 0.2), 6.6, 0.06, 6.6, Math.PI / 2, a, 0, clock ? 0xffffff : S.cClock);
+    for (let j = 0; j < 6; j++) F.box(S.dark, S.cDark, ...face(k, -3.5 + j * 1.4, 25.6, W / 2 + 0.04), 0.7, 0.8, 0.06, a);   // the attic's square windows
+    for (const o of [-1.6, 1.6]) F.cyl(wall, st, ...face(k, o, 31.4, W / 2 - 0.9), 0.32, 6.6, 'cyl8');   // the belfry's columns, its balustrade
+    F.box(wall, st2, ...face(k, 0, 28.6, W / 2 - 0.65), W - 1.8, 0.9, 0.3, a);
+    F.cyl(wall, st, ...face(k, 0, 40.1, 2.95), 0.26, 5.0, 'cyl8');   // the upper stage's column
+  }
+  F.box(wall, st2, 0, 27.3, 0, W + 1.4, 0.8, W + 1.4); F.box(wall, st, 0, 27.9, 0, W + 0.8, 0.4, W + 0.8);   // the cornice
+  F.box(S.dark, dark, 0, 31.4, 0, W - 2.6, 6.6, W - 2.6);   // the belfry: its dark core, the piers at its corners, the entablature
+  for (const ex of [-1, 1]) for (const ez of [-1, 1]) F.box(wall, st, ex * (W / 2 - 0.9), 31.4, ez * (W / 2 - 0.9), 1.6, 6.6, 1.6);
+  F.box(wall, st2, 0, 35.1, 0, W + 0.4, 0.9, W + 0.4);
+  F.box(wall, st, 0, 36.5, 0, W - 1.8, 1.9, W - 1.8);   // the stepped stage, the urns round it
+  for (const ex of [-1, 1]) for (const ez of [-1, 1]) { F.ell(wall, st2, ex * (W / 2 - 0.5), 36.0, ez * (W / 2 - 0.5), 0.42, 0.55, 0.42, true); F.ell(wall, st2, ex * 3.1, 43.85, ez * 3.1, 0.3, 0.4, 0.3, true); }
+  F.box(S.dark, dark, 0, 40.1, 0, 4.4, 5.0, 4.4);   // the upper open stage: its core, its corner piers, its entablature
+  for (const ex of [-1, 1]) for (const ez of [-1, 1]) F.box(wall, st, ex * 2.7, 40.1, ez * 2.7, 1.1, 5.0, 1.1);
+  F.box(wall, st2, 0, 42.95, 0, 6.8, 0.7, 6.8);
+  F.cyl(wall, st2, 0, 43.6, 0, 2.5, 0.5, 'cyl');   // the round lantern: a ring of columns round its core, the cornice, the dome, the ball, the flagpole
+  F.cyl(S.dark, dark, 0, 45.5, 0, 1.5, 3.4, 'cyl8');
+  for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; F.cyl(wall, st, Math.cos(a) * 2.0, 45.5, Math.sin(a) * 2.0, 0.17, 3.4, 'cyl6'); }
+  F.cyl(wall, st2, 0, 47.4, 0, 2.6, 0.5, 'cyl');
+  F.ell(wall, st, 0, 47.6, 0, 2.2, 2.6, 2.2);
+  F.cyl(wall, st2, 0, 50.5, 0, 0.45, 0.8, 'cyl8'); F.ell(wall, st2, 0, 51.2, 0, 0.5, 0.5, 0.5, true);
+  F.cyl(S.metal, S.cDark, 0, 56.4, 0, 0.12, 9.6, 'cyl6');
 }
 // the Ferry Building's clock face: white with black numerals and hands at a quarter to eight
 export function clockTex() {
@@ -164,6 +199,35 @@ export function clockTex() {
     g.lineCap = 'round'; g.lineWidth = 6; g.beginPath(); g.moveTo(64, 64); g.lineTo(64 + Math.sin(7.75 / 12 * Math.PI * 2) * 30, 64 - Math.cos(7.75 / 12 * Math.PI * 2) * 30); g.stroke();
     g.lineWidth = 4; g.beginPath(); g.moveTo(64, 64); g.lineTo(64 + Math.sin(0.75 * Math.PI * 2) * 46, 64 - Math.cos(0.75 * Math.PI * 2) * 46); g.stroke();
   }, { repeat: false });
+}
+
+// ---------- the Palace of Fine Arts ----------
+// The rotunda, its frame on the water at y = 0: eight piers round an open octagon, each faced with a pair of Corinthian
+// columns (terracotta shafts, buff capitals); an arch springing between each two, the wall over it; the entablature;
+// the attic, its relief panels between the corner blocks, a draped figure on each looking out; the drum, its band, and
+// the low pale dome. K: the street kit (its columns).
+export function rotunda(F, S, K, { R = 11, H = 14.5, figF = F } = {}) {   // figF: where its figures go (a frame on a batcher whose reflection is not drawn)
+  const wall = S.wall, buff = '#ecd0ac', buff2 = '#dcb690', red = '#b0604a', A = (k) => (k / 8) * Math.PI * 2 + Math.PI / 8, ap = R * Math.cos(Math.PI / 8);
+  for (let k = 0; k < 8; k++) {
+    const a = A(k), c = Math.cos(a), s = Math.sin(a), ry = Math.PI / 2 - a;
+    F.box(wall, buff2, c * R, H / 2, s * R, 2.6, H, 2.6, ry);   // the pier, its pair of columns
+    for (const o of [-0.85, 0.85]) K.column(F, wall, c * (R + 1.05) + s * o, 0, s * (R + 1.05) - c * o, H, 0.5, red, { top: buff });
+    const am = a + Math.PI / 8, cm = Math.cos(am), sm = Math.sin(am), w = 2 * R * Math.sin(Math.PI / 8) - 2.6, r = w / 2, ys = H - 1.6 - r;   // the arch to the next pier, the wall over it
+    F.box(wall, buff2, cm * ap, (ys + r - 0.3 + H) / 2, sm * ap, w + 0.3, H - ys - r + 0.3, 1.2, Math.PI / 2 - am);
+    for (let j = 0; j < 8; j++) { const m = (Math.PI * (j + 0.5)) / 8; F.add(G.box, wall, cm * (ap + 0.65) + sm * Math.cos(m) * (r + 0.2), ys + Math.sin(m) * (r + 0.2), sm * (ap + 0.65) - cm * Math.cos(m) * (r + 0.2), (r + 0.2) * 0.42, 0.45, 0.3, 0, Math.PI / 2 - am, m + Math.PI / 2, buff); }
+  }
+  F.add(G.cyl8, wall, 0, H + 0.6, 0, 2 * (R + 1.7), 1.2, 2 * (R + 1.7), 0, Math.PI / 8, 0, buff2);   // the architrave and frieze, the cornice
+  F.add(G.cyl8, wall, 0, H + 1.45, 0, 2 * (R + 2.1), 0.5, 2 * (R + 2.1), 0, Math.PI / 8, 0, buff);
+  F.add(G.cyl8, wall, 0, H + 3.7, 0, 2 * (R + 0.6), 4.0, 2 * (R + 0.6), 0, Math.PI / 8, 0, buff2);   // the attic
+  for (let k = 0; k < 8; k++) {
+    const a = A(k), c = Math.cos(a), s = Math.sin(a), am = a + Math.PI / 8, cm = Math.cos(am), sm = Math.sin(am), fa = (R + 0.6) * Math.cos(Math.PI / 8);
+    F.box(wall, buff, c * (R + 1.0), H + 3.7, s * (R + 1.0), 2.2, 4.0, 2.2, Math.PI / 2 - a);   // a corner block, the figure on it
+    figure(frame(figF, c * (R + 1.0), H + 5.7, s * (R + 1.0), 1.15, -a), wall, buff, { arms: 'down', skirt: true, cloak: true });
+    F.box(wall, '#c89c78', cm * (fa + 0.05), H + 3.6, sm * (fa + 0.05), 2 * (R + 0.6) * Math.sin(Math.PI / 8) - 2.8, 2.6, 0.12, Math.PI / 2 - am);   // the relief panel between them, the figures in it
+    for (const o of [-1.2, -0.4, 0.4, 1.2]) F.box(wall, buff, cm * (fa + 0.14) + sm * o, H + 3.5 + (o === -0.4 || o === 0.4 ? 0.15 : 0), sm * (fa + 0.14) - cm * o, 0.42, 1.6 + Math.abs(o) * 0.2, 0.12, Math.PI / 2 - am);
+  }
+  F.cyl(wall, buff2, 0, H + 6.5, 0, R - 0.9, 1.8, 'cyl'); F.cyl(wall, '#c89c78', 0, H + 6.9, 0, R - 0.75, 0.5, 'cyl');   // the drum, its band
+  F.ell(wall, '#e6d4be', 0, H + 7.2, 0, R - 1.3, 5.0, R - 1.3);   // the dome
 }
 
 // ---------- fog ----------
