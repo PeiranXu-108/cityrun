@@ -287,7 +287,7 @@ export function makeKit() {
   const pave = paveTex();
   K.sideMat = std({ map: pave.clone(), roughness: 0.85 }); K.sideMat.map.repeat.set(2, 23); K.sideMat.map.needsUpdate = true;   // the track's side strips
   K.paveMat = std({ map: pave, roughness: 0.85 });
-  const sand = sandTex(); K.sandMat = std({ map: sand, roughness: 0.95, vertexColors: true });
+  const sand = sandTex(); K.sandMat = std({ map: sand, roughness: 0.95, vertexColors: true, emissive: '#ffffff', emissiveMap: sand, emissiveIntensity: 0.14 });   // (a little of the sky's glow kept in it)
   K.roadMat = std({ map: asphaltTex(), roughness: 0.9 });
   K.stuccoMat = std({ map: stuccoTex(), vertexColors: true, roughness: 0.88 });
   K.coralMat = std({ map: coralTex(), vertexColors: true, roughness: 0.92 });

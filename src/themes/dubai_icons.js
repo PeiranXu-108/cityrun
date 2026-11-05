@@ -131,21 +131,27 @@ export function emiratesTowers(F, S, { lo = false } = {}) {
 // a ring of stainless steel standing on edge, elliptical, its skin written over with calligraphy that is its windows
 // (lit from within), on a green hill; 77 m
 let calligraphyTex = null;
+const CAL_LINES = ['المستقبل لمن يتخيله ويصممه وينفذه', 'المستقبل لا ينتظر', 'المستقبل يمكن تصميمه وبناؤه', 'سنعيش لمئات السنين ولكن يمكننا أن نصنع شيئا يدوم'];
+const calText = (g, w, ink) => {
+  g.fillStyle = ink; g.textAlign = 'center'; g.textBaseline = 'middle'; g.direction = 'rtl';
+  for (let r = 0; r < 4; r++) { g.font = `700 ${46 + (r % 2) * 8}px "Aref Ruqaa", "Noto Kufi Arabic", serif`; g.fillText(CAL_LINES[r], w / 2 + (r % 2 ? 60 : -40), 34 + r * 62); }
+};
+// the steel skin with the calligraphy cut through it (map), and the same letters as the light behind them (glow)
 export function calligraphy() {
   if (calligraphyTex) return calligraphyTex;
-  calligraphyTex = canvasTex(1024, 256, (g, w, h) => {
+  const map = canvasTex(1024, 256, (g, w, h) => {
     g.fillStyle = '#b8bcc4'; g.fillRect(0, 0, w, h);
     for (let i = 0; i < 1200; i++) { g.fillStyle = `rgba(${Math.random() < 0.5 ? '255,255,255' : '60,64,72'},${Math.random() * 0.08})`; g.fillRect(Math.random() * w, Math.random() * h, 3, 3); }
-    g.fillStyle = '#141820'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.direction = 'rtl';
-    const lines = ['المستقبل لمن يتخيله ويصممه وينفذه', 'المستقبل لا ينتظر', 'المستقبل يمكن تصميمه وبناؤه', 'سنعيش لمئات السنين ولكن يمكننا أن نصنع شيئا يدوم'];
-    for (let r = 0; r < 4; r++) { g.font = `700 ${46 + (r % 2) * 8}px "Aref Ruqaa", "Noto Kufi Arabic", serif`; g.fillText(lines[r], w / 2 + (r % 2 ? 60 : -40), 34 + r * 62); }
+    calText(g, w, '#141820');
   });
+  const glow = canvasTex(1024, 256, (g, w, h) => { g.fillStyle = '#000000'; g.fillRect(0, 0, w, h); calText(g, w, '#ffdc9e'); });
+  calligraphyTex = { map, glow };
   return calligraphyTex;
 }
 export function museumOfFuture(F, S, { lo = false } = {}) {
   const ring = new THREE.TorusGeometry(30, 11.5, lo ? 8 : 14, lo ? 28 : 56);
   F.add(ring, S.steel || S.metal, 0, 40, 0, 1.3, 1.0, 1.0, 0, Math.PI / 2, 0, S.cSteel);   // the hole looks along x
-  F.add(HALF, S.green || S.wall, 0, 0, 0, 70, 22, 54, 0, 0, 0, S.cGreen);   // the hill
+  F.add(HALF, S.green || S.wall, 0, 0, 0, 56, 24, 112, 0, 0, 0, S.cGreen);   // the hill, long under the ring
   F.add(G.box, S.glow, 0, 12.5, 0, 40, 3, 16, 0, 0, 0, S.cLobby);
   return { top: F.at(0, 80, 0) };
 }

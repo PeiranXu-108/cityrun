@@ -16,6 +16,7 @@ import { KERB, X0, face, SAND, CORAL, WARM, DEIRA_SIGNS, SOUK_SIGNS, BLVD_SIGNS,
 // the gold road under the set sun, turquoise in the shallows
 export const GULF = { cHorizon: ['#e8a886'], cRose: ['#b88aa0'], cMauve: ['#6a6aa2'], cViolet: ['#3a4a86'], cDeep: ['#1e2a58'], cHaze: ['#d8a08a'], cGold: ['#ffc070', 1.2],
   cShallow: ['#3a8a98'], cFoam: ['#eaf4f4', 0.8], cWet: ['#6a5a48'] };
+const RIB = new THREE.TorusGeometry(1, 0.045, 4, 36, Math.PI);   // a station's rib: a half ring arching over its platforms
 export const WY = -1.4;   // the water's level (the walk is at 0)
 const _m = new THREE.Matrix4();
 
@@ -337,15 +338,16 @@ export function addBuildings(K) {
   };
   K.station = (b, x, zc, s, { y = 11, L = 64 } = {}) => {   // the shell: gold ribs over the platforms, glazed between, the name on it
     const R = 7.6;
-    for (let u = -L / 2; u <= L / 2; u += 2.2) {
+    for (let u = -L / 2; u <= L / 2; u += 2.4) {
       const k = 1 - Math.pow((2 * u) / L, 2) * 0.35;
-      b.add(G.tor, VC.metal, x, y + 1.3, zc + u, R * 2 * k, R * 2.3 * k, 1.6, 0, 0, 0, '#c8a050');
+      b.add(RIB, VC.metal, x, y + 1.3, zc + u, R * k, R * 1.15 * k, 1, 0, 0, 0, '#a88a4a');
     }
     const shell = new THREE.CylinderGeometry(R * 0.98, R * 0.98, L, 18, 1, true, -Math.PI / 2, Math.PI);
     shell.rotateX(-Math.PI / 2);   // its axis along the track, the half arching up
     b.addM(shell, VC.glow, new THREE.Matrix4().makeScale(1, 1.15, 1).setPosition(x, y + 1.3, zc), hdr('#ffe2b0', 0.55));
     b.box(VC.solid, '#e8e4dc', x, y + 1.6, zc, 12, 0.4, L);
-    K.bi(b, STATIONS[randi(0, STATIONS.length - 1)][0], STATIONS[randi(0, STATIONS.length - 1)][1], { w: 768, h: 192, color: '#ffffff', bg: '#c8202a' }, x - s * (R + 0.3), y + 4.5, zc, 6, 1.5, 1, 0, face(s), 0);
+    const [ar, en] = STATIONS[randi(0, STATIONS.length - 1)];
+    K.bi(b, ar, en, { w: 768, h: 192, color: '#ffffff', bg: '#c8202a' }, x - s * (R + 0.3), y + 4.5, zc, 6, 1.5, 1, 0, face(s), 0);
     b.block(VC.solid, '#d8d4cc', x - s * 2, 0, zc + L / 2 - 6, 5, y, 6);   // the stair tower down to the street
     b.box(VC.glow, hdr('#ffe8c0', 1.2), x - s * 4.55, y / 2, zc + L / 2 - 6, 0.06, y - 2, 4.6);
   };
@@ -391,6 +393,7 @@ export function addBuildings(K) {
   // ---------- the water ----------
   // the creek: the wharf's edge at x, the water out to the far bank's wharves, abras moored and crossing, dhows at the far
   // wharf with their cargo, Deira's lights and minarets beyond, their streaks of reflection
+  K.farBank = (b, s, x0, w = 90, col = '#2a2622') => b.box(VC.solid, col, s * (x0 + w / 2), -0.15, -CHUNK_LEN / 2, w, 0.3, CHUNK_LEN);   // the ground across the water
   K.waterPlane = (b, x0, x1, z0, z1, y = WY) => b.add(G.plane, K.water, (x0 + x1) / 2, y, -(z0 + z1) / 2, Math.abs(x1 - x0), z1 - z0, 1, -Math.PI / 2, 0, 0);
   K.refl = (b, x, z, col, len = 30, s = 1) => b.add(G.plane, VC.glowAdd, x - s * len / 2, WY + 0.04, z, len, rand(0.4, 1.0), 1, -Math.PI / 2, 0, 0, hdr(col, 0.5));
   K.wharf = (b, s, x, z0, z1, { wood = false } = {}) => {
@@ -402,6 +405,7 @@ export function addBuildings(K) {
   K.farShore = (b, s, x, { minarets = true, dhows = true } = {}) => {   // the other bank: its wharf, dhows, buildings and their lights
     if (dhows) for (let z = rand(4, 12); z < CHUNK_LEN - 8; z += rand(20, 28)) K.dhow(b, s * (x - 4), WY + 0.2, -z, { ry: (chance(0.5) ? 0 : Math.PI) + rand(-0.05, 0.05) });
     b.block(VC.solid, '#5a5048', s * (x + 6), WY - 1, -CHUNK_LEN / 2, 12, 2.4, CHUNK_LEN);
+    K.farBank(b, s, x + 12, 70, '#24201c');
     for (let z = 0; z < CHUNK_LEN - 4;) {
       const L = rand(8, 16), h = rand(8, 30), dd = rand(10, 16);
       b.addM(buildingGeo(dd, h, L, K.deira, 1.85, 3.1), K.deiraMat, at(s * (x + 12 + dd / 2), 0, -(z + L / 2)), pick(['#e8dcc8', '#d8ccb4', '#f0e4d0']));
@@ -452,7 +456,7 @@ export function addBuildings(K) {
   // dunes rising and falling either side, their ridges sharp on the windward side; camels, the warning sign, 4x4s
   // climbing, quad bikes, ghafs, a fence, the power line marching across
   K.dunes = (b, s, z0 = 0, z1 = CHUNK_LEN, { x0 = EDGE + 3, x1 = 140, seed = rand(0, 100) } = {}) => {
-    const NX = 18, NZ = 10, P = [], UV = [], C = [], idx = [], c0 = new THREE.Color('#e0b48a'), c1 = new THREE.Color('#b8805a');
+    const NX = 18, NZ = 10, P = [], UV = [], C = [], idx = [], c0 = new THREE.Color('#ffd2a4'), c1 = new THREE.Color('#d0905e');
     const hAt = (x, z) => { const t = (x - x0) / (x1 - x0), r = Math.max(0, Math.sin(x * 0.07 + seed) * Math.cos(z * 0.045 + seed * 0.7)); return Math.min(1, t * 2.5) * (5 + t * 22) * (0.45 + 0.55 * Math.pow(r, 0.7)) + Math.sin(z * 0.11 + x * 0.05) * 0.6; };
     for (let i = 0; i <= NX; i++) for (let j = 0; j <= NZ; j++) {
       const x = x0 + (x1 - x0) * Math.pow(i / NX, 1.4), z = z0 + ((z1 - z0) * j) / NZ, h = i === 0 ? 0 : hAt(x, z);
